@@ -1,0 +1,37 @@
+{
+  "_comment": "District-level soil nutrients that no remote source provides. SoilGrids models pH, N, CEC, SOC and texture but NOT phosphorus or potassium, so these come from published Indian soil-survey data and are labelled 'seeded' in every profile that uses them. They are DISTRICT AVERAGES, not measurements of any one field.",
+  "version": "2026-08-19",
+  "ratingClasses": {
+    "_comment": "Standard Indian soil-test rating boundaries, kg/ha.",
+    "availableP": { "low": "<10", "medium": "10-25", "high": ">25" },
+    "availableK": { "low": "<120", "medium": "120-280", "high": ">280" },
+    "availableN": { "low": "<280", "medium": "280-560", "high": ">560" }
+  },
+  "districts": [
+    {
+      "id": "IN-HR-JIND",
+      "country": "IN",
+      "state": "Haryana",
+      "district": "Jind",
+      "note": "Narwana tehsil, the Build Brief demo location, sits in Jind district on the Kaithal border.",
+      "centroid": { "lat": 29.31, "lng": 76.31 },
+      "soil": { "p": 17.0, "k": 300.0 },
+      "units": {
+        "p": "kg/ha available P (elemental, Olsen)",
+        "k": "kg/ha available K (as K2O, ammonium-acetate extractable)"
+      },
+      "rating": { "p": "medium", "k": "high" },
+      "confidence": "medium",
+      "derivation": {
+        "p": "Jind district mean phosphate reported as 15.73 kg/acre = 38.9 kg/ha P2O5; x0.436 = 17.0 kg/ha elemental P. Independently corroborated: a separate survey rates Jind 'medium' available phosphorus, and 17.0 falls inside the medium band (10-25).",
+        "k": "Jind rated 'high' available potash district-wide (high = >280 kg/ha). 300 is a representative value just inside that band; neighbouring Kaithal block surveys span 80-440 kg/ha."
+      },
+      "sources": [
+        "https://ijrar.com/upload_issue/ijrar_issue_20543466.pdf",
+        "https://indianecologicalsociety.com/wp-content/themes/ecology/volume_pdfs/1733322601.pdf",
+        "https://epubs.icar.org.in/index.php/JoSSWQ/article/view/148506"
+      ],
+      "replaceWith": "An actual Soil Health Card reading for the demo field, if product can obtain one."
+    }
+  ]
+}

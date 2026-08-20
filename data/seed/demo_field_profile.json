@@ -1,0 +1,126 @@
+{
+  "fieldId": "field-demo-narwana",
+  "polygon": [
+    [
+      29.609446,
+      76.109367
+    ],
+    [
+      29.609446,
+      76.110633
+    ],
+    [
+      29.610554,
+      76.110633
+    ],
+    [
+      29.610554,
+      76.109367
+    ],
+    [
+      29.609446,
+      76.109367
+    ]
+  ],
+  "centroid": {
+    "lat": 29.61,
+    "lng": 76.11
+  },
+  "areaHa": 1.5011,
+  "ndvi": 0.813,
+  "soil": {
+    "ph": 7.9,
+    "n": 1.33,
+    "p": 17.0,
+    "k": 300.0,
+    "cec": 12.8,
+    "moisture": 0.48,
+    "soc": 9.2,
+    "clay": 20.2
+  },
+  "rainForecastMm": 0.9,
+  "rainForecast7dMm": 35.6,
+  "tempForecast": [
+    {
+      "date": "2026-08-19",
+      "maxC": 33.5,
+      "minC": 27.0
+    },
+    {
+      "date": "2026-08-20",
+      "maxC": 33.4,
+      "minC": 27.0
+    },
+    {
+      "date": "2026-08-21",
+      "maxC": 32.4,
+      "minC": 25.5
+    },
+    {
+      "date": "2026-08-22",
+      "maxC": 32.6,
+      "minC": 25.1
+    },
+    {
+      "date": "2026-08-23",
+      "maxC": 32.7,
+      "minC": 24.3
+    },
+    {
+      "date": "2026-08-24",
+      "maxC": 33.4,
+      "minC": 26.6
+    },
+    {
+      "date": "2026-08-25",
+      "maxC": 32.7,
+      "minC": 27.0
+    }
+  ],
+  "radiationScore": 0.391,
+  "healthChip": "GREEN",
+  "sources": {
+    "boundary": {
+      "source": "farmer pin",
+      "status": "live",
+      "fetchedAt": "2026-08-19T15:28:57+00:00",
+      "note": "1.5 ha square generated from pin"
+    },
+    "soil": {
+      "source": "ISRIC SoilGrids v2.0 (0-5cm)",
+      "status": "live",
+      "fetchedAt": "2026-08-19T15:29:00+00:00",
+      "note": "phosphorus and potassium not modelled by SoilGrids; seed from Soil Health Card"
+    },
+    "soilNPK": {
+      "source": "Jind district average (seeded)",
+      "status": "seeded",
+      "fetchedAt": "2026-08-19T15:29:00+00:00",
+      "note": "phosphorus and potassium have no remote-sensing source; p: medium, k: high"
+    },
+    "forecast": {
+      "source": "Open-Meteo forecast API",
+      "status": "live",
+      "fetchedAt": "2026-08-19T15:29:01+00:00"
+    },
+    "agroclimate": {
+      "source": "NASA POWER daily (AG community)",
+      "status": "live",
+      "fetchedAt": "2026-08-19T15:29:02+00:00",
+      "note": "most recent valid observation is 5 day(s) behind today"
+    },
+    "ndvi": {
+      "source": "Sentinel-2 SR via Earth Engine (COPERNICUS/S2_SR_HARMONIZED)",
+      "status": "live",
+      "fetchedAt": "2026-08-19T15:29:06+00:00",
+      "note": "median over 2026-01-15 to 2026-03-15, clouds masked below 40%"
+    },
+    "healthChip": {
+      "source": "M0 rule set (health.py)",
+      "status": "live",
+      "fetchedAt": "2026-08-19T15:29:06+00:00",
+      "note": "driver: healthy"
+    }
+  },
+  "generatedAt": "2026-08-19T15:28:57+00:00"
+}

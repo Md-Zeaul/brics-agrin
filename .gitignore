@@ -1,0 +1,29 @@
+# Secrets — the Tech Spec is explicit: never commit keys
+.env
+*.env
+service-account*.json
+gcp-sa*.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Flutter / Dart
+app/build/
+app/.dart_tool/
+app/.flutter-plugins*
+app/ios/Pods/
+app/macos/Pods/
+.packages
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*.pyc
