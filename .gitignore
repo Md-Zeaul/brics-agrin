@@ -27,3 +27,6 @@ venv/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Built web bundle — rebuild with flutter build web
+app/build/

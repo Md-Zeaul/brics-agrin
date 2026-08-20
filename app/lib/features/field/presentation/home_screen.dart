@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../data/field_repository.dart';
 import '../domain/field_profile.dart';
+import 'onboarding_screen.dart';
 import 'widgets/health_chip_badge.dart';
 import 'widgets/provenance_list.dart';
 
@@ -36,14 +37,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
   FieldProfile get _profile => _result.profile;
 
+  /// Back to capture. Without this the first cached profile is a dead end —
+  /// the farmer can never add a second plot and the demo can never show S1
+  /// again without clearing browser storage by hand.
+  void _startNewField() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => OnboardingScreen(repository: widget.repository),
+      ),
+    );
+  }
+
   Future<void> _refresh() async {
     setState(() => _refreshing = true);
     try {
-      final refreshed = await widget.repository.profileForPin(
-        lat: _profile.centroid.lat,
-        lng: _profile.centroid.lng,
-        fieldId: _profile.fieldId,
-      );
+      // Refreshing a drawn field through profileForPin would silently replace
+      // the farmer's boundary with a default square and change its area.
+      final refreshed = _profile.areaIsMeasured
+          ? await widget.repository.profileForPolygon(
+              polygon: _profile.polygon,
+              fieldId: _profile.fieldId,
+              crop: _profile.crop,
+            )
+          : await widget.repository.profileForPin(
+              lat: _profile.centroid.lat,
+              lng: _profile.centroid.lng,
+              fieldId: _profile.fieldId,
+              crop: _profile.crop,
+            );
       if (mounted) setState(() => _result = refreshed);
     } catch (error) {
       if (!mounted) return;
@@ -68,6 +89,11 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Namaste, Rekha'),
         actions: [
           IconButton(
+            onPressed: _refreshing ? null : _startNewField,
+            icon: const Icon(Icons.add_location_alt_outlined),
+            tooltip: 'Capture a different field',
+          ),
+          IconButton(
             onPressed: _refreshing ? null : _refresh,
             icon: _refreshing
                 ? const SizedBox(
@@ -83,7 +109,13 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_result.fromCache)
+          if (_result.origin == ProfileOrigin.restored)
+            const _Banner(
+              icon: Icons.history,
+              text: 'Saved profile from your last visit. '
+                  'Refresh to fetch today\'s readings.',
+            ),
+          if (_result.origin == ProfileOrigin.stale)
             _Banner(
               icon: Icons.cloud_off,
               text: 'Offline — showing the last saved profile. '

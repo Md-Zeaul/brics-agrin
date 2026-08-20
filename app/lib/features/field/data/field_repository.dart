@@ -9,21 +9,37 @@ import '../domain/field_profile.dart';
 import 'field_cache.dart';
 import 'm0_client.dart';
 
+/// How a profile reached the screen. The three cases read alike to the code
+/// and completely differently to the farmer, so they must not share a flag.
+enum ProfileOrigin {
+  /// Fetched from M0 during this run.
+  live,
+
+  /// Restored from cache on launch. No network call was attempted, so calling
+  /// this "offline" would be a guess dressed as a fact.
+  restored,
+
+  /// A live call was attempted, failed, and this is the last good profile.
+  stale,
+}
+
 /// A profile plus how it was obtained, so the UI can be honest about it.
 class FieldProfileResult {
   const FieldProfileResult({
     required this.profile,
-    required this.fromCache,
+    required this.origin,
     this.warning,
   });
 
   final FieldProfile profile;
 
-  /// True when the network call failed and this is the last good profile.
-  final bool fromCache;
+  final ProfileOrigin origin;
 
   /// Why the live call failed, when it did.
   final String? warning;
+
+  /// True whenever the numbers on screen were not fetched this run.
+  bool get fromCache => origin != ProfileOrigin.live;
 }
 
 class FieldRepository {
@@ -85,13 +101,13 @@ class FieldRepository {
         crop: crop,
       );
       await _cache.save(profile);
-      return FieldProfileResult(profile: profile, fromCache: false);
+      return FieldProfileResult(profile: profile, origin: ProfileOrigin.live);
     } on M0Exception catch (error) {
       final cached = await _cache.load();
       if (cached == null) rethrow;
       return FieldProfileResult(
         profile: cached,
-        fromCache: true,
+        origin: ProfileOrigin.stale,
         warning: error.message,
       );
     }

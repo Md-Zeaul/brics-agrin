@@ -65,7 +65,10 @@ class _Bootstrap extends StatelessWidget {
         }
 
         return HomeScreen(
-          result: FieldProfileResult(profile: cached, fromCache: true),
+          result: FieldProfileResult(
+            profile: cached,
+            origin: ProfileOrigin.restored,
+          ),
           repository: repository,
         );
       },

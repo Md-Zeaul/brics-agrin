@@ -251,7 +251,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
-            result: FieldProfileResult(profile: _profile(), fromCache: false),
+            result: FieldProfileResult(profile: _profile(), origin: ProfileOrigin.live),
             repository: FieldRepository(),
           ),
         ),
@@ -297,7 +297,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
-            result: FieldProfileResult(profile: profile, fromCache: false),
+            result: FieldProfileResult(profile: profile, origin: ProfileOrigin.live),
             repository: FieldRepository(),
           ),
         ),
@@ -329,7 +329,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
-            result: FieldProfileResult(profile: profile, fromCache: false),
+            result: FieldProfileResult(profile: profile, origin: ProfileOrigin.live),
             repository: FieldRepository(),
           ),
         ),
@@ -358,7 +358,7 @@ void main() {
           home: HomeScreen(
             result: FieldProfileResult(
               profile: _profile(ndvi: 0.62, chip: HealthChip.green),
-              fromCache: false,
+              origin: ProfileOrigin.live,
             ),
             repository: FieldRepository(),
           ),
@@ -382,7 +382,7 @@ void main() {
                 percentile: 0.598,
                 ndvi: 0.579,
               ),
-              fromCache: false,
+              origin: ProfileOrigin.live,
             ),
             repository: FieldRepository(),
           ),
@@ -402,7 +402,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
-            result: FieldProfileResult(profile: _profile(), fromCache: false),
+            result: FieldProfileResult(profile: _profile(), origin: ProfileOrigin.live),
             repository: FieldRepository(),
           ),
         ),
@@ -418,7 +418,7 @@ void main() {
           home: HomeScreen(
             result: FieldProfileResult(
               profile: _profile(boundaryMode: 'drawn'),
-              fromCache: false,
+              origin: ProfileOrigin.live,
             ),
             repository: FieldRepository(),
           ),
@@ -434,7 +434,7 @@ void main() {
           home: HomeScreen(
             result: FieldProfileResult(
               profile: _profile(crop: const {'id': 'sugarcane', 'label': 'Sugarcane'}),
-              fromCache: false,
+              origin: ProfileOrigin.live,
             ),
             repository: FieldRepository(),
           ),
@@ -444,13 +444,53 @@ void main() {
       expect(find.textContaining('Sugarcane'), findsOneWidget);
     });
 
+    testWidgets('a restored profile is not called offline', (tester) async {
+      // Booting from cache attempts no network call, so claiming the farmer is
+      // offline would be a guess presented as a fact.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(
+            result: FieldProfileResult(
+              profile: _profile(),
+              origin: ProfileOrigin.restored,
+            ),
+            repository: FieldRepository(),
+          ),
+        ),
+      );
+
+      expect(find.textContaining('Saved profile from your last visit'),
+          findsOneWidget);
+      expect(find.textContaining('Offline'), findsNothing);
+    });
+
+    testWidgets('a second field can be captured from the profile',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(
+            result: FieldProfileResult(
+              profile: _profile(),
+              origin: ProfileOrigin.restored,
+            ),
+            repository: FieldRepository(),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('Capture a different field'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OnboardingScreen), findsOneWidget);
+    });
+
     testWidgets('offline cache shows the banner', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
             result: FieldProfileResult(
               profile: _profile(),
-              fromCache: true,
+              origin: ProfileOrigin.stale,
               warning: 'could not reach M0',
             ),
             repository: FieldRepository(),
