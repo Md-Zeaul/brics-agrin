@@ -53,6 +53,19 @@ GENERATION_CONFIG = {
     "maxOutputTokens": 2048,
     "responseMimeType": "application/json",
     "responseSchema": _SCHEMA,
+    # Thinking off, for two separate reasons.
+    #
+    # Speed: with it on this call took 10.9 seconds, with it off 1.6. The card
+    # is the first thing on S2 and nobody should wait ten seconds for it.
+    #
+    # Correctness: `maxOutputTokens` counts thinking tokens too. Left on, the
+    # model spent the whole budget reasoning and returned a response with no
+    # `parts` at all — not a worse answer, no answer. Raising the budget would
+    # buy a slower call and the same cliff further out.
+    #
+    # Nothing is lost. Picking the most pressing of four pre-vetted
+    # recommendations is a ranking, not a derivation.
+    "thinkingConfig": {"thinkingBudget": 0},
 }
 
 _INSTRUCTIONS = """\
@@ -151,6 +164,11 @@ class GeminiChooser:
         # live AI while running on rules.
         self.last_error: str | None = None
 
+        # The model's own one-line justification. Not shown to the farmer —
+        # the templates already carry a reason — but invaluable when asking
+        # why the card said what it said.
+        self.last_reason: str | None = None
+
     @property
     def source(self) -> str:
         return f"{self.model} via Vertex AI ({self.region})"
@@ -201,10 +219,30 @@ class GeminiChooser:
             self.last_error = f"HTTP {error.code}: {detail}"
             raise
 
-        text = (
-            payload["candidates"][0]["content"]["parts"][0]["text"]
-        )
-        choice = json.loads(text)
+        choice = self._parse(payload)
         log.info("gemini chose %s / %s — %s", choice.get("primary"),
                  choice.get("secondary"), choice.get("why"))
+        self.last_reason = choice.get("why")
         return choice.get("primary"), choice.get("secondary") or None
+
+    def _parse(self, payload: dict) -> dict:
+        """Read the choice out of a response that may not contain one.
+
+        A truncated or filtered response still returns 200 with a candidate
+        that has no `parts`. Indexing straight into it raises a KeyError whose
+        message says `parts` and nothing about why, which is the least useful
+        possible thing to find in a log at midnight before a demo.
+        """
+        candidates = payload.get("candidates") or []
+        if not candidates:
+            raise ValueError(f"no candidates in the response: {str(payload)[:200]}")
+
+        candidate = candidates[0]
+        parts = (candidate.get("content") or {}).get("parts")
+        if not parts:
+            reason = candidate.get("finishReason", "unknown")
+            raise ValueError(
+                f"the model returned no content (finishReason: {reason}) — "
+                "usually the token budget was spent before the answer"
+            )
+        return json.loads(parts[0]["text"])

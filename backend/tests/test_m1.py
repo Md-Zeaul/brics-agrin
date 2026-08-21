@@ -540,3 +540,43 @@ class TestGeminiChooser(unittest.TestCase):
             chooser(candidates, signals, {"stage": stage})
         self.assertIsNotNone(chooser.last_error)
         self.assertIn("nonexistent", chooser.last_error)
+
+
+class TestGeminiResponseHandling(unittest.TestCase):
+    """A 200 is not the same as an answer."""
+
+    def test_thinking_is_off(self):
+        # Measured: 10.9s with it on, 1.6s with it off. And `maxOutputTokens`
+        # counts thinking tokens, so leaving it on spent the whole budget
+        # reasoning and returned a response carrying no answer at all.
+        self.assertEqual(
+            gemini.GENERATION_CONFIG["thinkingConfig"]["thinkingBudget"], 0)
+
+    def test_a_good_payload_is_read(self):
+        chooser = gemini.GeminiChooser(project="p")
+        payload = {"candidates": [{"content": {"parts": [
+            {"text": '{"primary": "soil.alkaline", "why": "pH is high"}'}]}}]}
+        self.assertEqual(chooser._parse(payload)["primary"], "soil.alkaline")
+
+    def test_a_response_with_no_content_names_the_finish_reason(self):
+        # This is what a truncated response actually looks like: HTTP 200, one
+        # candidate, no parts. Indexing into it raises KeyError('parts'), which
+        # says nothing about why — the least useful thing to find in a log the
+        # night before a demo.
+        chooser = gemini.GeminiChooser(project="p")
+        with self.assertRaises(ValueError) as caught:
+            chooser._parse({"candidates": [{"finishReason": "MAX_TOKENS"}]})
+        self.assertIn("MAX_TOKENS", str(caught.exception))
+        self.assertIn("token budget", str(caught.exception))
+
+    def test_an_empty_response_is_reported_not_indexed(self):
+        chooser = gemini.GeminiChooser(project="p")
+        with self.assertRaises(ValueError):
+            chooser._parse({})
+
+    def test_the_models_justification_is_kept_for_debugging(self):
+        # Never shown to the farmer — the template already carries a reason —
+        # but it is the only way to answer "why did the card say that?".
+        chooser = gemini.GeminiChooser(project="p")
+        self.assertIsNone(chooser.last_reason)
+        self.assertIn("last_reason", vars(chooser))
