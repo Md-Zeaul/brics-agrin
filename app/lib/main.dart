@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'core/l10n/app_language.dart';
 import 'core/l10n/language_scope.dart';
 import 'core/routes.dart';
+import 'core/theme.dart';
 import 'features/field/data/field_repository.dart';
 import 'features/field/presentation/home_screen.dart';
 import 'features/field/presentation/onboarding_screen.dart';
@@ -44,10 +45,7 @@ class _AgriSetuAppState extends State<AgriSetuApp> {
       child: MaterialApp(
         title: 'AgriSetu',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)),
-          useMaterial3: true,
-        ),
+        theme: AppTheme.light(),
         routes: Routes.table,
         home: _Bootstrap(repository: _repository),
       ),

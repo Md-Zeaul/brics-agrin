@@ -64,6 +64,19 @@ flutter:
   assets:
     - assets/crops.json
 
+  # Bundled, not fetched. Roboto has no Devanagari, and on the web Flutter
+  # silently downloads a Noto fallback from Google's CDN the first time it
+  # meets one — which means with no network every Hindi string renders as
+  # empty boxes. The demo's own selling point is that steps 1-5 work offline,
+  # and its demo language is Hindi, so that fallback cannot be relied on.
+  # OFL-1.1, so redistributing it here is fine.
+  fonts:
+    - family: Noto Sans Devanagari
+      fonts:
+        - asset: assets/fonts/NotoSansDevanagari-Regular.ttf
+        - asset: assets/fonts/NotoSansDevanagari-SemiBold.ttf
+          weight: 600
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
