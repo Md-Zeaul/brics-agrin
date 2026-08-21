@@ -28,12 +28,28 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from m0_field import build_field_profile  # noqa: E402
 from m0_field.seed import seeded_soil_for  # noqa: E402
-from m1_advisory.advisory import build_advisory  # noqa: E402
+from m1_advisory.advisory import RULES_SOURCE, build_advisory  # noqa: E402
+from m1_advisory.gemini import GeminiChooser, gemini_available  # noqa: E402
 
 PORT = 8787
 DEMO_PIN = {"lat": 29.61, "lng": 76.11}
 
 log = logging.getLogger("agrisetu.dev")
+
+
+def _note_fallback(advisory, chooser) -> None:
+    """Record it in the payload when the model was tried and did not answer.
+
+    A demo that claims live AI while quietly running on rules is worse than one
+    that runs on rules openly, and from the outside the two look identical.
+    """
+    if chooser is None or not chooser.last_error:
+        return
+    if advisory.chosen_by.source != RULES_SOURCE:
+        return
+    advisory.chosen_by.note = (
+        f"{advisory.chosen_by.note} — model unavailable: {chooser.last_error}"
+    )
 
 
 def _district_seed(body: dict) -> dict | None:
@@ -84,16 +100,23 @@ class Handler(BaseHTTPRequestHandler):
         profile = body.get("profile")
         if not isinstance(profile, dict):
             return self._json(400, {"error": "body needs a 'profile' object from /m0"})
+
+        chooser = GeminiChooser() if gemini_available() else None
         try:
             advisory = build_advisory(
                 profile,
                 language=body.get("language", "en"),
                 sowing_date=body.get("sowingDate"),
+                chooser=chooser,
+                chooser_source=chooser.source if chooser else None,
             )
         except Exception as error:  # the card must never be the thing that breaks
             log.exception("advisory build failed")
             return self._json(500, {"error": str(error)})
+
+        _note_fallback(advisory, chooser)
         return self._json(200, advisory.to_dict())
+
 
     def _build(self, body: dict):
         if not body.get("pin") and not body.get("polygon"):

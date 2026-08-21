@@ -25,7 +25,8 @@ import os
 
 from m0_field import build_field_profile
 from m0_field.seed import seeded_soil_for
-from m1_advisory.advisory import build_advisory
+from m1_advisory.advisory import RULES_SOURCE, build_advisory
+from m1_advisory.gemini import GeminiChooser, gemini_available
 
 # Fallback NDVI for the demo field while Earth Engine access is pending.
 FALLBACK_NDVI = float(os.environ.get("FALLBACK_NDVI", "0.62"))
@@ -90,11 +91,25 @@ def m1_advisory_http(request):
     if not isinstance(profile, dict):
         return (json.dumps({"error": "provide a 'profile' object from M0"}), 400, _JSON)
 
+    chooser = GeminiChooser() if gemini_available() else None
     advisory = build_advisory(
         profile,
         language=body.get("language", "en"),
         sowing_date=body.get("sowingDate"),
+        chooser=chooser,
+        chooser_source=chooser.source if chooser else None,
     )
+
+    # Say so in the payload when the model was tried and did not answer. A demo
+    # claiming live AI while quietly running on rules is worse than one running
+    # on rules openly, and from outside the two look the same.
+    if chooser is not None and chooser.last_error and (
+        advisory.chosen_by.source == RULES_SOURCE
+    ):
+        advisory.chosen_by.note = (
+            f"{advisory.chosen_by.note} — model unavailable: {chooser.last_error}"
+        )
+
     return (json.dumps(advisory.to_dict()), 200, _JSON)
 
 

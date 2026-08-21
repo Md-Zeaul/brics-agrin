@@ -10,6 +10,7 @@ rests on, and what happens when a chooser misbehaves.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import unittest
 from datetime import date
@@ -17,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from m1_advisory import doses, rules  # noqa: E402
+from m1_advisory import doses, gemini, rules  # noqa: E402
 from m1_advisory.advisory import RULES_SOURCE, build_advisory  # noqa: E402
 from m1_advisory.signals import extract, value  # noqa: E402
 from m1_advisory.stage import (  # noqa: E402
@@ -451,3 +452,91 @@ class TestAdviceIsActionable(unittest.TestCase):
         joined = " ".join(advisory.actions)
         self.assertNotIn("{", joined)
         self.assertRegex(joined, r"\d+ kg")
+
+
+class TestGeminiChooser(unittest.TestCase):
+    """The prompt and the gating, without ever calling Vertex."""
+
+    def setUp(self):
+        self._saved = {k: os.environ.get(k)
+                       for k in ("M1_DISABLE_GEMINI", "GCP_PROJECT", "VERTEX_REGION")}
+        os.environ["GCP_PROJECT"] = "test-project"
+        os.environ.pop("M1_DISABLE_GEMINI", None)
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def _candidates(self):
+        signals = extract(profile())
+        stage, days = growth_stage("wheat", "2026-06-20", TODAY)
+        return rules.eligible(signals, stage, days), signals, stage, days
+
+    def test_it_can_be_switched_off_without_touching_code(self):
+        os.environ["M1_DISABLE_GEMINI"] = "1"
+        self.assertFalse(gemini.gemini_available())
+
+    def test_it_is_unavailable_without_a_project(self):
+        os.environ.pop("GCP_PROJECT")
+        self.assertFalse(gemini.gemini_available())
+
+    def test_the_region_is_configurable_for_data_residency(self):
+        # A BRICS demo whose selling point is that data stays in-country should
+        # not quietly run its advisory through Iowa.
+        os.environ["VERTEX_REGION"] = "southamerica-east1"
+        chooser = gemini.GeminiChooser()
+        self.assertIn("southamerica-east1-aiplatform", chooser.endpoint)
+        self.assertIn("southamerica-east1", chooser.source)
+
+    def test_the_prompt_offers_only_eligible_templates(self):
+        candidates, signals, stage, days = self._candidates()
+        prompt = gemini._prompt(
+            candidates, signals,
+            {"stage": stage, "daysAfterSowing": days, "crop": "wheat"},
+        )
+        for template in candidates:
+            self.assertIn(template.id, prompt)
+        offered = {t.id for t in TEMPLATES if t.id in prompt}
+        self.assertEqual(offered, {t.id for t in candidates},
+                         "the prompt leaked a template that is not eligible")
+
+    def test_the_prompt_carries_provenance_not_just_numbers(self):
+        # The model is told which readings are district defaults so it can
+        # weigh them lower, which is the judgement rules cannot make.
+        candidates, signals, stage, days = self._candidates()
+        prompt = gemini._prompt(candidates, signals, {"stage": stage})
+        self.assertIn("[seeded]", prompt)
+        self.assertIn("[live]", prompt)
+
+    def test_the_prompt_says_it_is_choosing_not_writing(self):
+        candidates, signals, stage, days = self._candidates()
+        prompt = gemini._prompt(candidates, signals, {"stage": stage})
+        self.assertIn("NOT writing advice", prompt)
+        self.assertIn("Do not invent", prompt)
+
+    def test_temperature_is_zero_so_two_runs_agree(self):
+        # Pre-cached demo audio depends on the same field advising the same way.
+        self.assertEqual(gemini.GENERATION_CONFIG["temperature"], 0)
+
+    def test_the_response_is_forced_into_the_schema(self):
+        # Free text would need parsing, and a parse failure is a blank card.
+        config = gemini.GENERATION_CONFIG
+        self.assertEqual(config["responseMimeType"], "application/json")
+        self.assertEqual(config["responseSchema"]["required"], ["primary"])
+
+    def test_a_credential_failure_is_recorded_not_swallowed(self):
+        # Token acquisition happens before the HTTP call, so an unrecorded
+        # failure here would surface as a rules advisory with no sign that a
+        # model was ever attempted.
+        os.environ["GCP_SA_JSON"] = "/nonexistent/key.json"
+        self.addCleanup(os.environ.pop, "GCP_SA_JSON", None)
+
+        chooser = gemini.GeminiChooser()
+        candidates, signals, stage, days = self._candidates()
+        with self.assertRaises(Exception):
+            chooser(candidates, signals, {"stage": stage})
+        self.assertIsNotNone(chooser.last_error)
+        self.assertIn("nonexistent", chooser.last_error)
