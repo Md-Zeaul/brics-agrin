@@ -18,7 +18,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .doses import urea_topdress_kg_per_ha
+
 UNAVAILABLE = "unavailable"
+SEEDED = "seeded"
+REPORTED = "reported"
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,27 @@ def extract(profile: dict) -> dict[str, Signal]:
     add("soilNitrogen", soil.get("n"), "soilNPK")
 
     add("slopeDeg", terrain.get("slopeDeg"), "boundary")
+    add("areaHa", profile.get("areaHa"), "boundary")
+
+    crop = profile.get("crop") or {}
+    if crop.get("label"):
+        found["cropLabel"] = Signal(
+            name="cropLabel", value=crop["label"], source="crop",
+            status=_status(profile, "crop") or REPORTED,
+        )
+
+    # The rate for one vegetative top-dressing, kg of urea per hectare.
+    #
+    # Absent rather than zero for a legume or a crop with no published rate,
+    # so every template that quotes a dose becomes ineligible by the same
+    # mechanism as any other missing signal. Telling a chickpea grower to
+    # spread urea is not a smaller mistake than telling them nothing.
+    rate = urea_topdress_kg_per_ha(crop.get("id"))
+    if rate:
+        found["ureaTopdressKgPerHa"] = Signal(
+            name="ureaTopdressKgPerHa", value=rate,
+            source="extension rate table", status=SEEDED,
+        )
 
     # Derived. The single most useful number M0 does not itself compute: over
     # the coming week, does the sky supply more water than the crop spends?

@@ -70,6 +70,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Your field'), findsOneWidget);
+      // Without a sowing date the button says what is missing.
+      expect(find.text('Add the sowing date'), findsOneWidget);
+      await tester.setSowingDate();
       expect(find.text('Confirm field'), findsOneWidget);
       // Build Brief default crop, shown in the default language (Hindi).
       expect(find.text('गेहूँ'), findsOneWidget);
@@ -245,6 +248,8 @@ void main() {
       expect(find.text('Sugarcane'), findsOneWidget);
     });
   });
+
+  _sowingDateGateTests();
 
   group('S2 home', () {
     testWidgets('shows the M0 signals and their provenance', (tester) async {
@@ -514,6 +519,43 @@ void main() {
   });
 }
 
+void _sowingDateGateTests() {
+  group('S1 sowing date is required', () {
+    testWidgets('confirm is blocked until a date is given', (tester) async {
+      // Every quantity M1 gives is scaled by growth stage, and stage comes
+      // only from this date. Without it the advisory can name a problem but
+      // never a dose — so the capture screen insists on it.
+      await tester.pumpOnboarding();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tap to set'), findsOneWidget);
+      final blocked = tester.widget<FilledButton>(find.byType(FilledButton));
+      expect(blocked.onPressed, isNull);
+      expect(find.text('Add the sowing date'), findsOneWidget);
+    });
+
+    testWidgets('the missing field is marked, not only the button',
+        (tester) async {
+      await tester.pumpOnboarding();
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+
+      await tester.setSowingDate();
+      expect(find.byIcon(Icons.error_outline), findsNothing);
+    });
+
+    testWidgets('giving a date unblocks confirm', (tester) async {
+      await tester.pumpOnboarding();
+      await tester.pumpAndSettle();
+      await tester.setSowingDate();
+
+      expect(find.text('Tap to set'), findsNothing);
+      final ready = tester.widget<FilledButton>(find.byType(FilledButton));
+      expect(ready.onPressed, isNotNull);
+    });
+  });
+}
+
 // --- Boundary drawing (M0's "drops a pin (or draws a boundary)") ---
 
 extension on WidgetTester {
@@ -528,6 +570,16 @@ extension on WidgetTester {
     view.devicePixelRatio = 3.0;
     addTearDown(view.resetPhysicalSize);
     addTearDown(view.resetDevicePixelRatio);
+  }
+
+  /// S1 will not confirm without a sowing date, so any test that reaches the
+  /// confirm button has to supply one the way a farmer would. Accepts the
+  /// picker's default, which is today.
+  Future<void> setSowingDate() async {
+    await tap(find.text('Tap to set'));
+    await pumpAndSettle();
+    await tap(find.text('OK'));
+    await pumpAndSettle();
   }
 
   Future<void> pumpOnboarding() async {
@@ -641,6 +693,7 @@ void drawingTests() {
       // Area only appears once the ring closes.
       expect(find.textContaining('ha'), findsWidgets);
 
+      await tester.setSowingDate();
       expect(find.text('Confirm field'), findsOneWidget);
       final button = tester.widget<FilledButton>(find.byType(FilledButton));
       expect(button.onPressed, isNotNull);
@@ -666,6 +719,7 @@ void drawingTests() {
       await tester.tap(find.text('Undo'));
       await tester.pumpAndSettle();
 
+      await tester.setSowingDate();
       expect(find.text('Confirm field'), findsOneWidget);
       final fixed = tester.widget<FilledButton>(find.byType(FilledButton));
       expect(fixed.onPressed, isNotNull);

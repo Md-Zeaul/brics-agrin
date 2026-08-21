@@ -20,6 +20,7 @@ from typing import Callable
 
 from m0_field.health import BARE_SOIL_NDVI
 
+from . import doses
 from .signals import Signal, value
 from .stage import VEGETATIVE
 from .templates import TEMPLATES, Template
@@ -86,6 +87,9 @@ CONDITIONS: dict[str, Condition] = {
     "fertiliser.nitrogen_low":
         lambda s: (_n(s, "soilNitrogen") or 99) < LOW_NITROGEN
                   and (_n(s, "ndviPercentile") or 1.0) < 0.40,
+    # The dose signal is absent for legumes and for crops with no published
+    # rate, so this is already ineligible for them. The nitrogen check stops
+    # it firing on a field that has plenty.
     "fertiliser.topdress_window":
         lambda s: (_n(s, "soilNitrogen") or 99) < HIGH_NITROGEN,
     "protection.heat_stress":
@@ -109,17 +113,29 @@ SLOTS: dict[str, Slots] = {
         lambda s: {"rainMm": round(_n(s, "rainForecast7dMm") or 0)},
     "irrigation.apply":
         lambda s: {
-            "deficitMm": abs(round(_n(s, "waterBalance7dMm") or 0)),
+            "depthMm": doses.irrigation_depth_mm(_n(s, "waterBalance7dMm") or 0),
+            "volumePerHaM3": doses.irrigation_volume_m3(
+                doses.irrigation_depth_mm(_n(s, "waterBalance7dMm") or 0), 1.0),
             "topsoilPct": round((_n(s, "topsoilWater") or 0) * 100),
         },
     "irrigation.watch":
-        lambda s: {"deficitMm": abs(round(_n(s, "waterBalance7dMm") or 0))},
+        lambda s: {
+            "deficitMm": abs(round(_n(s, "waterBalance7dMm") or 0)),
+            "depthMm": doses.irrigation_depth_mm(_n(s, "waterBalance7dMm") or 0),
+        },
     "fertiliser.hold_rain":
         lambda s: {"rainTomorrowMm": round(_n(s, "rainForecastMm") or 0)},
     "fertiliser.nitrogen_low":
-        lambda s: {"behindPct": 100 - _pct_behind(s)},
+        lambda s: {
+            "behindPct": 100 - _pct_behind(s),
+            "ureaKgPerHa": int(_n(s, "ureaTopdressKgPerHa") or 0),
+        },
     "fertiliser.topdress_window":
-        lambda s: {"days": s["__days__"]},
+        lambda s: {
+            "days": s["__days__"],
+            "ureaKgPerHa": int(_n(s, "ureaTopdressKgPerHa") or 0),
+            "cropLabel": value(s, "cropLabel", "your crop"),
+        },
     "protection.heat_stress":
         lambda s: {"tmaxC": round(_n(s, "airTempMaxC") or 0)},
     "protection.disease_watch":

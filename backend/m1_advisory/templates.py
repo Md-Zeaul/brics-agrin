@@ -74,19 +74,19 @@ TEMPLATES: tuple[Template, ...] = (
         text={
             "en": {
                 "situation": "{rainMm} mm of rain is expected over the next 7 days.",
-                "action": "Hold irrigation this week.",
+                "action": "Do not irrigate for the next 7 days.",
                 "reason": "That is more than your crop will use, so watering now "
                           "would waste it and risk waterlogging.",
             },
             "hi": {
                 "situation": "अगले 7 दिनों में {rainMm} मिमी बारिश का अनुमान है।",
-                "action": "इस हफ़्ते सिंचाई रोक दें।",
+                "action": "अगले 7 दिन सिंचाई बिलकुल न करें।",
                 "reason": "यह आपकी फसल की ज़रूरत से ज़्यादा है — अभी पानी देना "
                           "बर्बादी होगी और जलभराव का ख़तरा रहेगा।",
             },
             "pt": {
                 "situation": "São esperados {rainMm} mm de chuva nos próximos 7 dias.",
-                "action": "Suspenda a irrigação esta semana.",
+                "action": "Não irrigue nos próximos 7 dias.",
                 "reason": "É mais do que a lavoura vai consumir; irrigar agora "
                           "desperdiça água e arrisca encharcamento.",
             },
@@ -95,51 +95,61 @@ TEMPLATES: tuple[Template, ...] = (
     _t(
         "irrigation.apply", "irrigation", URGENT,
         requires=["waterBalance7dMm", "topsoilWater"],
-        slots=["deficitMm", "topsoilPct"],
+        slots=["depthMm", "volumePerHaM3", "topsoilPct"],
         text={
             "en": {
-                "situation": "Your crop will need about {deficitMm} mm more water "
-                             "than rain will bring this week.",
-                "action": "Irrigate within the next two days.",
-                "reason": "The top of the soil is already dry, at {topsoilPct}% moisture.",
+                "situation": "The top of your soil is dry, at {topsoilPct}% moisture, "
+                             "and rain will not cover this week's demand.",
+                "action": "Irrigate {depthMm} mm within two days — about "
+                          "{volumePerHaM3} m³ per hectare.",
+                "reason": "Less than this will not reach the root zone; much more "
+                          "drains past it and carries nitrogen away with it.",
             },
             "hi": {
-                "situation": "इस हफ़्ते बारिश से आपकी फसल को लगभग {deficitMm} मिमी "
-                             "कम पानी मिलेगा।",
-                "action": "अगले दो दिनों में सिंचाई कर लें।",
-                "reason": "ऊपरी मिट्टी पहले से सूखी है — नमी सिर्फ़ {topsoilPct}% है।",
+                "situation": "ऊपरी मिट्टी सूखी है — नमी सिर्फ़ {topsoilPct}% — और "
+                             "इस हफ़्ते बारिश ज़रूरत पूरी नहीं करेगी।",
+                "action": "दो दिन के भीतर {depthMm} मिमी सिंचाई करें — लगभग "
+                          "{volumePerHaM3} घन मीटर प्रति हेक्टेयर।",
+                "reason": "इससे कम पानी जड़ों तक नहीं पहुँचेगा; बहुत ज़्यादा नीचे "
+                          "चला जाता है और साथ में नाइट्रोजन भी बहा ले जाता है।",
             },
             "pt": {
-                "situation": "A lavoura vai precisar de cerca de {deficitMm} mm a mais "
-                             "do que a chuva trará esta semana.",
-                "action": "Irrigue nos próximos dois dias.",
-                "reason": "A camada superficial já está seca, com {topsoilPct}% de umidade.",
+                "situation": "A camada superficial está seca, com {topsoilPct}% de "
+                             "umidade, e a chuva não cobre a demanda desta semana.",
+                "action": "Irrigue {depthMm} mm em até dois dias — cerca de "
+                          "{volumePerHaM3} m³ por hectare.",
+                "reason": "Menos que isso não alcança a zona das raízes; muito mais "
+                          "drena além dela e leva o nitrogênio junto.",
             },
         },
     ),
     _t(
         "irrigation.watch", "irrigation", ROUTINE,
         requires=["waterBalance7dMm", "rootzoneWater"],
-        slots=["deficitMm"],
+        slots=["deficitMm", "depthMm"],
         text={
             "en": {
                 "situation": "Rain this week falls about {deficitMm} mm short of "
                              "what your crop will use.",
-                "action": "Check the soil by hand before you irrigate.",
-                "reason": "The shortfall is small and there is still water deeper "
-                          "in the root zone.",
+                "action": "Dig 15 cm down in two places. If the soil crumbles dry, "
+                          "irrigate {depthMm} mm.",
+                "reason": "The shortfall is small and there is still water deeper in "
+                          "the root zone, so the soil decides this one, not the sky.",
             },
             "hi": {
                 "situation": "इस हफ़्ते बारिश ज़रूरत से लगभग {deficitMm} मिमी कम रहेगी।",
-                "action": "सिंचाई से पहले मिट्टी हाथ से जाँच लें।",
-                "reason": "कमी ज़्यादा नहीं है और जड़ों के नीचे अभी नमी बची है।",
+                "action": "दो जगह 15 सेंटीमीटर गहरा खोदकर देखें। मिट्टी सूखी भुरभुरी "
+                          "लगे तो {depthMm} मिमी सिंचाई करें।",
+                "reason": "कमी ज़्यादा नहीं है और जड़ों के नीचे नमी बची है — इसलिए "
+                          "फ़ैसला आसमान नहीं, मिट्टी करेगी।",
             },
             "pt": {
-                "situation": "A chuva desta semana fica cerca de {deficitMm} mm "
-                             "abaixo do que a lavoura vai consumir.",
-                "action": "Confira o solo com a mão antes de irrigar.",
-                "reason": "O déficit é pequeno e ainda há água mais fundo na zona "
-                          "das raízes.",
+                "situation": "A chuva desta semana fica cerca de {deficitMm} mm abaixo "
+                             "do que a lavoura vai consumir.",
+                "action": "Cave 15 cm em dois pontos. Se o solo esfarelar seco, "
+                          "irrigue {depthMm} mm.",
+                "reason": "O déficit é pequeno e ainda há água mais fundo, então quem "
+                          "decide é o solo, não o céu.",
             },
         },
     ),
@@ -150,78 +160,89 @@ TEMPLATES: tuple[Template, ...] = (
         text={
             "en": {
                 "situation": "{rainTomorrowMm} mm of rain is expected tomorrow.",
-                "action": "Do not apply nitrogen today.",
-                "reason": "Urea spread before heavy rain washes away before the "
-                          "crop can take it up.",
+                "action": "Do not spread urea today or tomorrow. Wait until the rain "
+                          "has passed, then apply.",
+                "reason": "Urea spread before heavy rain washes away before the crop "
+                          "can take it up — the money goes into the drain.",
             },
             "hi": {
                 "situation": "कल {rainTomorrowMm} मिमी बारिश का अनुमान है।",
-                "action": "आज यूरिया न डालें।",
+                "action": "आज और कल यूरिया न डालें। बारिश निकल जाने के बाद डालें।",
                 "reason": "तेज़ बारिश से पहले डाली गई यूरिया फसल के काम आने से पहले "
-                          "ही बह जाती है।",
+                          "बह जाती है — पैसा नाली में चला जाता है।",
             },
             "pt": {
                 "situation": "São esperados {rainTomorrowMm} mm de chuva amanhã.",
-                "action": "Não aplique nitrogênio hoje.",
-                "reason": "Ureia aplicada antes de chuva forte é lixiviada antes de "
-                          "a lavoura conseguir absorvê-la.",
+                "action": "Não aplique ureia hoje nem amanhã. Espere a chuva passar "
+                          "e aplique depois.",
+                "reason": "Ureia aplicada antes de chuva forte é lixiviada antes de a "
+                          "lavoura absorvê-la — o dinheiro vai embora na água.",
             },
         },
     ),
     _t(
         "fertiliser.nitrogen_low", "fertiliser", ADVISORY,
-        requires=["soilNitrogen", "ndviPercentile"],
-        slots=["behindPct"],
+        requires=["soilNitrogen", "ndviPercentile", "ureaTopdressKgPerHa"],
+        slots=["behindPct", "ureaKgPerHa"],
         text={
             "en": {
-                "situation": "Your canopy is behind {behindPct}% of nearby fields "
-                             "and soil nitrogen reads low.",
-                "action": "Plan a nitrogen top-dressing.",
-                "reason": "That nitrogen figure is a district estimate, not a soil "
-                          "test — check your Soil Health Card before buying.",
+                "situation": "Your canopy is behind {behindPct}% of nearby fields and "
+                             "soil nitrogen reads low.",
+                "action": "Spread {ureaKgPerHa} kg of urea per hectare this week, then "
+                          "irrigate lightly to wash it in.",
+                "reason": "That nitrogen reading is a district estimate, not a soil "
+                          "test — check your Soil Health Card before you buy.",
             },
             "hi": {
-                "situation": "आपकी फसल की हरियाली आस-पास के {behindPct}% खेतों से "
-                             "पीछे है और मिट्टी में नाइट्रोजन कम दिख रही है।",
-                "action": "नाइट्रोजन की टॉप-ड्रेसिंग की योजना बनाएँ।",
+                "situation": "आपकी फसल की हरियाली आस-पास के {behindPct}% खेतों से पीछे "
+                             "है और मिट्टी में नाइट्रोजन कम दिख रही है।",
+                "action": "इस हफ़्ते {ureaKgPerHa} किलो यूरिया प्रति हेक्टेयर डालें, "
+                          "फिर हल्की सिंचाई करके उसे मिट्टी में बैठा दें।",
                 "reason": "यह नाइट्रोजन का आँकड़ा इलाक़े का अनुमान है, मिट्टी की जाँच "
                           "नहीं — ख़रीदने से पहले मृदा स्वास्थ्य कार्ड देख लें।",
             },
             "pt": {
                 "situation": "Seu dossel está atrás de {behindPct}% das lavouras "
                              "vizinhas e o nitrogênio do solo aparece baixo.",
-                "action": "Programe uma adubação nitrogenada de cobertura.",
-                "reason": "Esse valor de nitrogênio é uma estimativa regional, não "
+                "action": "Aplique {ureaKgPerHa} kg de ureia por hectare esta semana e "
+                          "faça uma irrigação leve para incorporá-la.",
+                "reason": "Essa leitura de nitrogênio é uma estimativa regional, não "
                           "uma análise de solo — confirme antes de comprar.",
             },
         },
     ),
     _t(
         "fertiliser.topdress_window", "fertiliser", ADVISORY,
-        requires=["soilNitrogen"],
-        slots=["days"],
+        requires=["ureaTopdressKgPerHa", "cropLabel", "soilNitrogen"],
+        slots=["days", "ureaKgPerHa", "cropLabel"],
         stages=["vegetative"],
         text={
             "en": {
                 "situation": "Your crop is {days} days from sowing, in its main "
                              "growth phase.",
-                "action": "This is the window for a nitrogen top-dressing.",
-                "reason": "Nitrogen given during vegetative growth builds the "
-                          "tillers that carry yield later.",
+                "action": "Spread {ureaKgPerHa} kg of urea per hectare, then irrigate "
+                          "lightly to wash it in.",
+                "reason": "That is about a third of the season's nitrogen for "
+                          "{cropLabel}, the usual share at this stage. It is a general "
+                          "rate — check your Soil Health Card before you buy.",
             },
             "hi": {
                 "situation": "बुवाई को {days} दिन हो चुके हैं — फसल अपनी मुख्य "
                              "बढ़वार में है।",
-                "action": "नाइट्रोजन टॉप-ड्रेसिंग का यही सही समय है।",
-                "reason": "बढ़वार के समय दी गई नाइट्रोजन उन कल्लों को बनाती है जिन "
-                          "पर आगे चलकर पैदावार टिकती है।",
+                "action": "{ureaKgPerHa} किलो यूरिया प्रति हेक्टेयर डालें, फिर हल्की "
+                          "सिंचाई करके उसे मिट्टी में बैठा दें।",
+                "reason": "यह {cropLabel} की पूरे मौसम की नाइट्रोजन का लगभग एक तिहाई "
+                          "है, जो इस अवस्था में दिया जाता है। यह आम दर है — ख़रीदने "
+                          "से पहले मृदा स्वास्थ्य कार्ड देख लें।",
             },
             "pt": {
-                "situation": "A lavoura está com {days} dias após a semeadura, na "
-                             "fase de crescimento.",
-                "action": "Esta é a janela para a adubação nitrogenada de cobertura.",
-                "reason": "Nitrogênio aplicado no crescimento vegetativo forma os "
-                          "perfilhos que sustentam a produtividade.",
+                "situation": "A lavoura está com {days} dias após a semeadura, na fase "
+                             "de crescimento.",
+                "action": "Aplique {ureaKgPerHa} kg de ureia por hectare e faça uma "
+                          "irrigação leve para incorporá-la.",
+                "reason": "É cerca de um terço do nitrogênio da safra de {cropLabel}, a "
+                          "parcela usual neste estádio. É uma dose geral — confirme com "
+                          "sua análise de solo antes de comprar.",
             },
         },
     ),
@@ -232,21 +253,24 @@ TEMPLATES: tuple[Template, ...] = (
         text={
             "en": {
                 "situation": "Tomorrow reaches {tmaxC} °C with very dry air.",
-                "action": "Irrigate in the evening, not the middle of the day.",
-                "reason": "Evaporative demand is high, so midday water is lost "
-                          "before it reaches the roots.",
+                "action": "Irrigate after 5 pm or before 8 am. Do not irrigate between "
+                          "11 am and 4 pm.",
+                "reason": "In the middle of the day most of the water evaporates before "
+                          "it reaches the roots.",
             },
             "hi": {
                 "situation": "कल तापमान {tmaxC} °C तक जाएगा और हवा बहुत सूखी रहेगी।",
-                "action": "सिंचाई शाम को करें, दोपहर में नहीं।",
-                "reason": "वाष्पीकरण तेज़ है — दोपहर का पानी जड़ों तक पहुँचने से "
-                          "पहले ही उड़ जाता है।",
+                "action": "शाम 5 बजे के बाद या सुबह 8 बजे से पहले सिंचाई करें। "
+                          "दोपहर 11 से 4 के बीच बिलकुल न करें।",
+                "reason": "दोपहर में ज़्यादातर पानी जड़ों तक पहुँचने से पहले ही "
+                          "भाप बनकर उड़ जाता है।",
             },
             "pt": {
                 "situation": "Amanhã chega a {tmaxC} °C com ar muito seco.",
-                "action": "Irrigue à noite, não no meio do dia.",
-                "reason": "A demanda evaporativa está alta; a água do meio-dia se "
-                          "perde antes de chegar às raízes.",
+                "action": "Irrigue depois das 17h ou antes das 8h. Não irrigue entre "
+                          "11h e 16h.",
+                "reason": "No meio do dia a maior parte da água evapora antes de "
+                          "chegar às raízes.",
             },
         },
     ),
@@ -258,23 +282,26 @@ TEMPLATES: tuple[Template, ...] = (
             "en": {
                 "situation": "Warm days with a wet canopy — the conditions fungal "
                              "disease likes.",
-                "action": "Scan a few leaves for spots or rust this week.",
-                "reason": "Caught early, treatment can stay with a bio option "
-                          "instead of a chemical one.",
+                "action": "Check 10 plants in each of 5 spots this week. Turn the "
+                          "leaves over and look for spots or rust.",
+                "reason": "Caught in the first few plants, treatment can stay with a "
+                          "bio option instead of a chemical spray.",
             },
             "hi": {
                 "situation": "दिन गर्म हैं और पत्तियाँ गीली रह रही हैं — फफूँद रोग "
                              "के लिए अनुकूल स्थिति।",
-                "action": "इस हफ़्ते कुछ पत्तियों को धब्बों या रतुआ के लिए स्कैन करें।",
-                "reason": "जल्दी पकड़ में आ जाए तो जैविक उपचार से काम चल जाता है, "
-                          "रासायनिक की ज़रूरत नहीं पड़ती।",
+                "action": "इस हफ़्ते खेत में 5 जगह चुनकर हर जगह 10 पौधे देखें। "
+                          "पत्तियाँ पलटकर धब्बे या रतुआ ढूँढ़ें।",
+                "reason": "शुरुआती कुछ पौधों में ही पकड़ लिया जाए तो जैविक उपचार से "
+                          "काम चल जाता है, रासायनिक छिड़काव की ज़रूरत नहीं पड़ती।",
             },
             "pt": {
-                "situation": "Dias quentes com dossel úmido — as condições que a "
-                             "doença fúngica prefere.",
-                "action": "Escaneie algumas folhas em busca de manchas ou ferrugem.",
-                "reason": "Detectada cedo, dá para tratar com uma opção biológica "
-                          "em vez de química.",
+                "situation": "Dias quentes com dossel úmido — as condições que a doença "
+                             "fúngica prefere.",
+                "action": "Verifique 10 plantas em cada um de 5 pontos esta semana. Vire "
+                          "as folhas e procure manchas ou ferrugem.",
+                "reason": "Detectada nas primeiras plantas, dá para tratar com uma opção "
+                          "biológica em vez de pulverização química.",
             },
         },
     ),
@@ -286,22 +313,26 @@ TEMPLATES: tuple[Template, ...] = (
             "en": {
                 "situation": "Your canopy is weaker than {behindPct}% of the farms "
                              "around you.",
-                "action": "Walk the field and look for patchy growth, pests or "
-                          "standing water.",
-                "reason": "The satellite can see the difference but not the cause.",
+                "action": "Walk the field today. Check 5 spots for thin patches, insects "
+                          "under the leaves, and standing water.",
+                "reason": "The satellite can see the difference but not the cause — only "
+                          "standing in the field will tell you which of the three it is.",
             },
             "hi": {
                 "situation": "आपके खेत की हरियाली आस-पास के {behindPct}% खेतों से "
                              "कमज़ोर है।",
-                "action": "खेत में घूमकर देखें — कहीं बढ़वार पतली, कीट या पानी "
-                          "भरा तो नहीं।",
-                "reason": "सैटेलाइट फ़र्क़ देख सकता है, वजह नहीं।",
+                "action": "आज खेत में घूमें। 5 जगह देखें — बढ़वार पतली तो नहीं, "
+                          "पत्तियों के नीचे कीड़े तो नहीं, पानी तो नहीं भरा।",
+                "reason": "सैटेलाइट फ़र्क़ देख सकता है, वजह नहीं — तीनों में से कौन "
+                          "सी है, यह खेत में खड़े होकर ही पता चलेगा।",
             },
             "pt": {
                 "situation": "Seu dossel está mais fraco que o de {behindPct}% das "
                              "lavouras ao redor.",
-                "action": "Percorra o talhão procurando falhas, pragas ou água parada.",
-                "reason": "O satélite enxerga a diferença, mas não a causa.",
+                "action": "Percorra o talhão hoje. Verifique 5 pontos: falhas, insetos "
+                          "sob as folhas e água parada.",
+                "reason": "O satélite enxerga a diferença, mas não a causa — só andando "
+                          "no talhão dá para saber qual das três é.",
             },
         },
     ),
@@ -311,51 +342,54 @@ TEMPLATES: tuple[Template, ...] = (
         slots=[],
         text={
             "en": {
-                "situation": "The fields around you are bare — the area is between "
-                             "crops.",
-                "action": "Use the planner to choose what to sow next.",
-                "reason": "There is no canopy to assess yet, so field readings will "
-                          "not mean much until sowing.",
+                "situation": "The fields around you are bare — the area is between crops.",
+                "action": "Open the planner and choose your next crop.",
+                "reason": "There is no canopy to assess yet, so field readings will not "
+                          "mean much until sowing.",
             },
             "hi": {
                 "situation": "आस-पास के खेत ख़ाली हैं — इलाक़ा दो फसलों के बीच में है।",
-                "action": "अगली फसल चुनने के लिए योजना खोलें।",
-                "reason": "अभी कोई फसल खड़ी नहीं है, इसलिए बुवाई तक खेत की रीडिंग "
-                          "का ख़ास मतलब नहीं।",
+                "action": "योजना खोलें और अगली फसल चुनें।",
+                "reason": "अभी कोई फसल खड़ी नहीं है, इसलिए बुवाई तक खेत की रीडिंग का "
+                          "ख़ास मतलब नहीं।",
             },
             "pt": {
                 "situation": "As lavouras ao redor estão em pousio — a região está "
                              "entre safras.",
-                "action": "Use o planejador para escolher a próxima cultura.",
-                "reason": "Ainda não há dossel para avaliar, então as leituras do "
-                          "talhão dizem pouco até a semeadura.",
+                "action": "Abra o planejador e escolha a próxima cultura.",
+                "reason": "Ainda não há dossel para avaliar, então as leituras do talhão "
+                          "dizem pouco até a semeadura.",
             },
         },
     ),
     _t(
         "soil.alkaline", "soil", ROUTINE,
-        requires=["soilPh"],
+        # Gated on the dose signal as well as the pH: this is advice about how
+        # to place urea, and a legume that should never receive urea has no
+        # use for it.
+        requires=["soilPh", "ureaTopdressKgPerHa"],
         slots=["ph"],
         text={
             "en": {
                 "situation": "Your soil pH is {ph}, on the alkaline side.",
-                "action": "Work nitrogen into the soil rather than spreading it "
-                          "on the surface.",
-                "reason": "Above pH 8, surface-spread urea is lost to the air as "
-                          "ammonia before the crop reaches it.",
+                "action": "Mix urea into the soil about 5 cm deep. Do not spread it on "
+                          "the surface and leave it there.",
+                "reason": "Above pH 8, surface urea turns to ammonia gas and blows away "
+                          "within a day or two — a third of the bag can be lost.",
             },
             "hi": {
                 "situation": "आपकी मिट्टी का pH {ph} है — क्षारीय तरफ़।",
-                "action": "यूरिया ऊपर से बिखेरने के बजाय मिट्टी में मिलाएँ।",
-                "reason": "pH 8 से ऊपर ऊपर-ऊपर डाली गई यूरिया अमोनिया बनकर हवा में "
-                          "उड़ जाती है, फसल तक पहुँचती ही नहीं।",
+                "action": "यूरिया को मिट्टी में लगभग 5 सेंटीमीटर गहरा मिलाएँ। ऊपर से "
+                          "बिखेरकर ऐसे ही न छोड़ें।",
+                "reason": "pH 8 से ऊपर ऊपर पड़ी यूरिया एक-दो दिन में अमोनिया गैस बनकर "
+                          "उड़ जाती है — बोरी का एक तिहाई तक बरबाद हो सकता है।",
             },
             "pt": {
                 "situation": "O pH do seu solo é {ph}, do lado alcalino.",
-                "action": "Incorpore o nitrogênio ao solo em vez de aplicá-lo "
-                          "na superfície.",
-                "reason": "Acima de pH 8, a ureia na superfície se perde como "
-                          "amônia antes de a lavoura aproveitá-la.",
+                "action": "Incorpore a ureia a cerca de 5 cm de profundidade. Não deixe "
+                          "aplicada na superfície.",
+                "reason": "Acima de pH 8, a ureia na superfície vira gás amônia em um ou "
+                          "dois dias — até um terço da saca pode se perder.",
             },
         },
     ),
@@ -366,24 +400,24 @@ TEMPLATES: tuple[Template, ...] = (
         text={
             "en": {
                 "situation": "Your canopy is ahead of {aheadPct}% of nearby farms.",
-                "action": "Keep to your current schedule.",
+                "action": "No change this week. Check the field again in 7 days.",
                 "reason": "Nothing in this week's readings calls for a change.",
             },
             "hi": {
-                "situation": "आपके खेत की हरियाली आस-पास के {aheadPct}% खेतों से "
-                             "आगे है।",
-                "action": "जो चल रहा है, वही जारी रखें।",
+                "situation": "आपके खेत की हरियाली आस-पास के {aheadPct}% खेतों से आगे है।",
+                "action": "इस हफ़्ते कोई बदलाव नहीं। 7 दिन बाद खेत फिर देखें।",
                 "reason": "इस हफ़्ते की रीडिंग में बदलाव की कोई वजह नहीं दिखती।",
             },
             "pt": {
                 "situation": "Seu dossel está à frente de {aheadPct}% das lavouras "
                              "vizinhas.",
-                "action": "Mantenha o manejo atual.",
+                "action": "Sem mudanças esta semana. Confira o talhão de novo em 7 dias.",
                 "reason": "Nada nas leituras desta semana pede mudança.",
             },
         },
     ),
 )
+
 
 # Not in TEMPLATES, and never eligible: the floor for a field where nothing at
 # all could be established. Saying so is the honest output — a cheerful default
@@ -396,20 +430,20 @@ INSUFFICIENT_DATA = _t(
         "en": {
             "situation": "Not enough of today's readings came through for this field.",
             "action": "Refresh, or check back once the satellite passes again.",
-            "reason": "Advice without readings behind it would be a guess, so "
-                      "there is none to give.",
+            "reason": "Advice without readings behind it would be a guess, so there "
+                      "is none to give.",
         },
         "hi": {
             "situation": "इस खेत के लिए आज की पर्याप्त रीडिंग नहीं मिल पाई।",
             "action": "रिफ़्रेश करें, या सैटेलाइट के अगले चक्कर के बाद देखें।",
-            "reason": "बिना रीडिंग की सलाह सिर्फ़ अंदाज़ा होगी, इसलिए अभी कोई "
-                      "सलाह नहीं दी जा रही।",
+            "reason": "बिना रीडिंग की सलाह सिर्फ़ अंदाज़ा होगी, इसलिए अभी कोई सलाह "
+                      "नहीं दी जा रही।",
         },
         "pt": {
             "situation": "Não chegaram leituras suficientes para este talhão hoje.",
             "action": "Atualize, ou volte após a próxima passagem do satélite.",
-            "reason": "Recomendação sem leitura por trás seria um palpite, então "
-                      "não há nenhuma a dar.",
+            "reason": "Recomendação sem leitura por trás seria um palpite, então não "
+                      "há nenhuma a dar.",
         },
     },
 )

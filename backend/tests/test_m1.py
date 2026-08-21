@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from m1_advisory import rules  # noqa: E402
+from m1_advisory import doses, rules  # noqa: E402
 from m1_advisory.advisory import RULES_SOURCE, build_advisory  # noqa: E402
 from m1_advisory.signals import extract, value  # noqa: E402
 from m1_advisory.stage import (  # noqa: E402
@@ -369,3 +369,85 @@ class TestChooserIsUntrusted(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDoses(unittest.TestCase):
+    """Advice a farmer can act on means a number, and the right number."""
+
+    def test_urea_is_derived_from_the_season_rate_not_invented(self):
+        # Wheat: 120 kg N/ha season, a third at this stage, urea is 46% N.
+        self.assertEqual(doses.urea_topdress_kg_per_ha("wheat"), 85)
+        self.assertEqual(doses.urea_topdress_kg_per_ha("pearl_millet"), 45)
+
+    def test_legumes_are_never_given_a_nitrogen_dose(self):
+        # They fix their own. Urea here costs money and suppresses the
+        # nodulation the farmer already paid for in seed.
+        for legume in doses.FIXES_OWN_NITROGEN:
+            self.assertIsNone(doses.urea_topdress_kg_per_ha(legume), legume)
+
+    def test_an_unknown_crop_gets_no_dose_rather_than_a_default(self):
+        self.assertIsNone(doses.urea_topdress_kg_per_ha("dragonfruit"))
+        self.assertIsNone(doses.urea_topdress_kg_per_ha(None))
+
+    def test_irrigation_depth_is_clamped_at_both_ends(self):
+        # Too little cannot be spread evenly; too much drains past the roots
+        # and takes dissolved nitrogen with it.
+        self.assertEqual(doses.irrigation_depth_mm(-2), doses.MIN_IRRIGATION_MM)
+        self.assertEqual(doses.irrigation_depth_mm(-200), doses.MAX_IRRIGATION_MM)
+        self.assertEqual(doses.irrigation_depth_mm(-40), 40)
+
+    def test_a_millimetre_over_a_hectare_is_ten_cubic_metres(self):
+        self.assertEqual(doses.irrigation_volume_m3(30, 1.0), 300)
+        self.assertEqual(doses.irrigation_volume_m3(30, 2.0), 600)
+
+    def test_quantities_round_to_something_a_farmer_can_measure(self):
+        self.assertEqual(doses.total_kg(85, 1.5011) % 5, 0)
+        self.assertEqual(doses.urea_topdress_kg_per_ha("wheat") % 5, 0)
+
+
+class TestAdviceIsActionable(unittest.TestCase):
+    """An advisory that names a problem without naming the response is not one."""
+
+    def test_advice_to_apply_urea_always_states_the_amount(self):
+        for template_id in ("fertiliser.nitrogen_low",
+                            "fertiliser.topdress_window"):
+            template = BY_ID[template_id]
+            for language in LANGUAGES:
+                self.assertIn(
+                    "{ureaKgPerHa}", template.text[language]["action"],
+                    f"{template_id}.{language} says to fertilise without saying "
+                    "how much",
+                )
+
+    def test_advice_to_irrigate_always_states_the_depth(self):
+        for template_id in ("irrigation.apply", "irrigation.watch"):
+            template = BY_ID[template_id]
+            for language in LANGUAGES:
+                self.assertIn("{depthMm}", template.text[language]["action"])
+
+    def test_a_legume_is_never_told_to_top_dress(self):
+        p = profile(**{"crop": {"id": "chickpea", "label": "Chickpea"},
+                       "soil.n": 0.5}, ndviPercentile=0.1)
+        advisory = build_advisory(
+            p, language="en", sowing_date="2026-06-20", today=TODAY)
+        for template_id in advisory.template_ids:
+            self.assertNotIn("urea", BY_ID[template_id].text["en"]["action"].lower(),
+                             f"{template_id} recommends urea for a legume")
+
+    def test_the_same_field_under_wheat_does_get_a_dose(self):
+        # The guard has to be specific to legumes, not a blanket silence.
+        p = profile(**{"soil.n": 0.5}, ndviPercentile=0.1)
+        advisory = build_advisory(
+            p, language="en", sowing_date="2026-06-20", today=TODAY)
+        self.assertTrue(
+            any("urea" in a.lower() for a in advisory.actions),
+            advisory.actions,
+        )
+
+    def test_the_rendered_dose_is_a_real_number_not_a_placeholder(self):
+        p = profile(**{"soil.n": 0.5}, ndviPercentile=0.1)
+        advisory = build_advisory(
+            p, language="en", sowing_date="2026-06-20", today=TODAY)
+        joined = " ".join(advisory.actions)
+        self.assertNotIn("{", joined)
+        self.assertRegex(joined, r"\d+ kg")

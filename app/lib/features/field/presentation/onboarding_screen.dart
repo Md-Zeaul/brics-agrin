@@ -347,13 +347,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           }
                         },
                         child: InputDecorator(
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Sowing date',
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
+                            // Required, because every quantity M1 gives is
+                            // scaled by growth stage. Without it the advisory
+                            // can name a problem but not a dose.
+                            suffixIcon: _sowingDate == null
+                                ? Icon(Icons.error_outline,
+                                    size: 18,
+                                    color: Theme.of(context).colorScheme.error)
+                                : null,
                           ),
                           child: Text(
                             _sowingDate == null
-                                ? 'Not set'
+                                ? 'Tap to set'
                                 : '${_sowingDate!.day}/${_sowingDate!.month}/'
                                     '${_sowingDate!.year}',
                             style: _sowingDate == null
@@ -380,7 +388,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _building || (_drawing && !_draftIsValid)
+                    onPressed: _building ||
+                            (_drawing && !_draftIsValid) ||
+                            _sowingDate == null
                         ? null
                         : _confirmField,
                     child: Padding(
@@ -401,11 +411,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               ],
                             )
                           : Text(
-                              !_drawing || _draftIsValid
-                                  ? 'Confirm field'
-                                  : _draftCrossesItself
+                              _drawing && !_draftIsValid
+                                  ? (_draftCrossesItself
                                       ? 'Lines cross — undo and redraw'
-                                      : 'Tap at least $_minVertices corners',
+                                      : 'Tap at least $_minVertices corners')
+                                  : _sowingDate == null
+                                      ? 'Add the sowing date'
+                                      : 'Confirm field',
                             ),
                     ),
                   ),
