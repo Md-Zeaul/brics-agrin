@@ -52,7 +52,7 @@ def build_advisory(
     """Turn an M0 profile into an Advisory. Never raises for missing signals."""
     from .contract import Advisory  # local: contract imports back for typing
 
-    signals = extract(profile)
+    signals = extract(profile, today)
     crop = profile.get("crop") or {}
     sowing = sowing_date or profile.get("sowingDate")
     stage, days = growth_stage(crop.get("id"), sowing, today)
@@ -91,8 +91,10 @@ def build_advisory(
             ),
         )
 
-    primary_slots = rules.render_slots(primary, signals, days)
-    secondary_slots = rules.render_slots(secondary, signals, days) if secondary else {}
+    primary_slots = rules.render_slots(primary, signals, days, language)
+    secondary_slots = (
+        rules.render_slots(secondary, signals, days, language) if secondary else {}
+    )
 
     used = _signals_behind(primary, secondary, signals, stage)
 

@@ -59,6 +59,8 @@ class FieldRepository {
     Map<String, dynamic>? seededSoil,
     Map<String, dynamic>? crop,
     String? sowingDate,
+    List<Map<String, dynamic>>? fertiliserLog,
+    String? lastIrrigation,
   }) =>
       _build(
         fieldId: fieldId,
@@ -66,6 +68,8 @@ class FieldRepository {
         seededSoil: seededSoil,
         crop: crop,
         sowingDate: sowingDate,
+        fertiliserLog: fertiliserLog,
+        lastIrrigation: lastIrrigation,
         pin: (lat: lat, lng: lng),
       );
 
@@ -77,6 +81,8 @@ class FieldRepository {
     Map<String, dynamic>? seededSoil,
     Map<String, dynamic>? crop,
     String? sowingDate,
+    List<Map<String, dynamic>>? fertiliserLog,
+    String? lastIrrigation,
   }) =>
       _build(
         fieldId: fieldId,
@@ -84,6 +90,8 @@ class FieldRepository {
         seededSoil: seededSoil,
         crop: crop,
         sowingDate: sowingDate,
+        fertiliserLog: fertiliserLog,
+        lastIrrigation: lastIrrigation,
         polygon: polygon,
       );
 
@@ -93,6 +101,8 @@ class FieldRepository {
     Map<String, dynamic>? seededSoil,
     Map<String, dynamic>? crop,
     String? sowingDate,
+    List<Map<String, dynamic>>? fertiliserLog,
+    String? lastIrrigation,
     ({double lat, double lng})? pin,
     List<List<double>>? polygon,
   }) async {
@@ -105,6 +115,8 @@ class FieldRepository {
         seededSoil: seededSoil,
         crop: crop,
         sowingDate: sowingDate,
+        fertiliserLog: fertiliserLog,
+        lastIrrigation: lastIrrigation,
       );
       await _cache.save(profile);
       return FieldProfileResult(profile: profile, origin: ProfileOrigin.live);

@@ -1,4 +1,4 @@
-/// S8 — Region risk detail. M5, owned by @herambskanda.
+/// S8 — Region risk detail. M5.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,7 +14,7 @@ class RegionDetailScreen extends StatelessWidget {
       screenId: 'S8',
       titleKey: 'region.title',
       module: 'M5 Nervous System',
-      owner: 'herambskanda',
+      issue: 6,
       purpose: 'Why this tile is red, and how many farms it covers.',
       elements: [
         'The region\'s risk drivers, ranked',

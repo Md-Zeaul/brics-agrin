@@ -17,7 +17,7 @@ class ModuleStub extends StatelessWidget {
     required this.screenId,
     required this.titleKey,
     required this.module,
-    required this.owner,
+    required this.issue,
     required this.purpose,
     required this.elements,
     this.actions = const [],
@@ -32,9 +32,9 @@ class ModuleStub extends StatelessWidget {
   /// 'M2 Disease Diagnostic'.
   final String module;
 
-  /// GitHub handle of whoever owns this module. Named on the screen so a
-  /// question about it has an obvious addressee.
-  final String owner;
+  /// The GitHub issue tracking this module. Shown on the screen so the scope
+  /// behind an unbuilt step is one click away rather than one search away.
+  final int issue;
 
   final String purpose;
 
@@ -69,7 +69,7 @@ class ModuleStub extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${t('common.notBuiltYet')} · @$owner',
+            '${t('common.notBuiltYet')} · issue #$issue',
             style: theme.textTheme.labelMedium
                 ?.copyWith(color: theme.colorScheme.outline),
           ),

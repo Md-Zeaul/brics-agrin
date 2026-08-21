@@ -1,4 +1,4 @@
-/// S7 — Command Center home. M5, owned by @herambskanda.
+/// S7 — Command Center home. M5.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,7 +15,7 @@ class CommandCenterScreen extends StatelessWidget {
       screenId: 'S7',
       titleKey: 'command.title',
       module: 'M5 Nervous System',
-      owner: 'herambskanda',
+      issue: 6,
       purpose: 'The planner\'s morning view: where the district is in trouble, '
           'at a glance.',
       elements: [

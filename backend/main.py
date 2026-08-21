@@ -67,6 +67,8 @@ def m0_field_http(request):
             ndvi_window=tuple(window) if window else None,
             crop=body.get("crop"),
             sowing_date=body.get("sowingDate"),
+            fertiliser_log=body.get("fertiliserLog"),
+            last_irrigation=body.get("lastIrrigation"),
         )
     except ValueError as error:
         return (json.dumps({"error": str(error)}), 400, _JSON)

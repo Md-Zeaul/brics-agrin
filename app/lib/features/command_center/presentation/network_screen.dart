@@ -1,4 +1,4 @@
-/// S10 — BRICS network. M7, owned by @herambskanda.
+/// S10 — BRICS network. M7.
 ///
 /// Cross-border is 20% of the score and this screen carries almost all of it.
 library;
@@ -16,7 +16,7 @@ class NetworkScreen extends StatelessWidget {
       screenId: 'S10',
       titleKey: 'network.title',
       module: 'M7 Federated Agri-DPI',
-      owner: 'herambskanda',
+      issue: 8,
       purpose: 'Prove the network is real: another nation\'s model makes this '
           'nation\'s predictions better, and no farm record crosses the border.',
       elements: [

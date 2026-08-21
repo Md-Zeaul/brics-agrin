@@ -132,6 +132,8 @@ class Handler(BaseHTTPRequestHandler):
                 ndvi_window=_window(body),
                 crop=body.get("crop"),
                 sowing_date=body.get("sowingDate"),
+                fertiliser_log=body.get("fertiliserLog"),
+                last_irrigation=body.get("lastIrrigation"),
             )
         except ValueError as error:
             return self._json(400, {"error": str(error)})

@@ -1,4 +1,4 @@
-/// S5 — Next-season planner. M3 + M4, owned by @Md-Zeaul.
+/// S5 — Season planner. M3 + M4.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,7 +15,7 @@ class PlannerScreen extends StatelessWidget {
       screenId: 'S5',
       titleKey: 'planner.title',
       module: 'M3 Regenerative Advisor + M4 Seed Intelligence',
-      owner: 'Md-Zeaul',
+      issue: 4,
       purpose: 'Rank next season\'s crops on risk-adjusted return and soil, '
           'then name the seed variety to actually buy.',
       elements: [

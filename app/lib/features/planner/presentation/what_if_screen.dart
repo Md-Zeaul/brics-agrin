@@ -1,4 +1,4 @@
-/// S6 — What-if simulator. M8, owned by @Md-Zeaul.
+/// S6 — What-if sliders. M8.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,7 +14,7 @@ class WhatIfScreen extends StatelessWidget {
       screenId: 'S6',
       titleKey: 'whatIf.title',
       module: 'M8 Farm Digital Twin',
-      owner: 'Md-Zeaul',
+      issue: 9,
       purpose: 'Stress-test the recommendation live, so the advice survives a '
           'question rather than a demo script.',
       elements: [

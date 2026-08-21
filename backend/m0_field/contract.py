@@ -79,6 +79,24 @@ class FieldProfile:
     # fertiliser advice is stage-dependent, which is why it lives on the
     # profile rather than in app state that a cache miss would lose.
     sowing_date: str | None = None
+
+    # What the farmer has already put on the field this season, most recent
+    # last. Each entry is {"date", "product", "bagsPerAcre"}, the last two
+    # optional — a date alone is a legitimate answer and still fixes the
+    # timing.
+    #
+    # A list rather than a single entry because the near-universal Indian
+    # pattern is two applications, DAP at sowing and urea at first irrigation.
+    # S1 collects one today; the season needs both, and a shape that has to
+    # change later would take the cache and the advisory's arithmetic with it.
+    fertiliser_log: list[dict] = field(default_factory=list)
+
+    # When the farmer last watered, ISO yyyy-mm-dd. Soil-water reanalysis lags
+    # by days, so a field irrigated yesterday can still read dry — without
+    # this, the advisory would confidently recommend water that is already in
+    # the ground.
+    last_irrigation: str | None = None
+
     ndvi: float | None = None
     ndvi_percentile: float | None = None        # rank among nearby cropland, 0-1
     neighbourhood_median_ndvi: float | None = None
@@ -103,6 +121,8 @@ class FieldProfile:
             "boundaryMode": self.boundary_mode,
             "crop": self.crop,
             "sowingDate": self.sowing_date,
+            "fertiliserLog": self.fertiliser_log,
+            "lastIrrigation": self.last_irrigation,
             "ndvi": self.ndvi,
             "ndviPercentile": self.ndvi_percentile,
             "neighbourhoodMedianNdvi": self.neighbourhood_median_ndvi,

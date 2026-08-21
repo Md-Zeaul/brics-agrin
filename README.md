@@ -53,8 +53,8 @@ Check Earth Engine credentials on their own:
 
 ## Tests
 
-    .venv/bin/python -m unittest discover -s backend/tests -t backend/tests   # 77
-    cd app && flutter analyze && flutter test                                  # 87
+    .venv/bin/python -m unittest discover -s backend/tests -t backend/tests   # 203
+    cd app && flutter analyze && flutter test                                  # 131
 
 ## Configuration
 

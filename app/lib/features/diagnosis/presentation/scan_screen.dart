@@ -1,4 +1,4 @@
-/// S3 — Crop scan. M2, owned by @herambskanda.
+/// S3 — Crop scan. M2.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,7 +15,7 @@ class ScanScreen extends StatelessWidget {
       screenId: 'S3',
       titleKey: 'scan.title',
       module: 'M2 Disease Diagnostic',
-      owner: 'herambskanda',
+      issue: 3,
       purpose: 'Photograph a leaf and get a diagnosis that still works with no '
           'network, because demo-day wifi cannot be trusted.',
       elements: [

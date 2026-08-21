@@ -34,6 +34,21 @@ _URGENCY_RANK = {URGENT: 3, ADVISORY: 2, ROUTINE: 1}
 
 LANGUAGES = ("en", "hi", "pt")
 
+# Singular and plural forms of a day count, per language. Hindi does not
+# inflect दिन here, so both forms are the same and the entry exists to keep the
+# lookup total rather than to say something.
+_DAY_FORMS = {
+    "en": ("1 day", "{n} days"),
+    "hi": ("1 दिन", "{n} दिन"),
+    "pt": ("1 dia", "{n} dias"),
+}
+
+
+def days_phrase(count: int, language: str = "en") -> str:
+    """A day count as words, so a template never renders "1 days"."""
+    singular, plural = _DAY_FORMS.get(language) or _DAY_FORMS["en"]
+    return singular if count == 1 else plural.format(n=count)
+
 
 @dataclass(frozen=True)
 class Template:
@@ -155,6 +170,37 @@ TEMPLATES: tuple[Template, ...] = (
         },
     ),
     _t(
+        "irrigation.recent", "irrigation", URGENT,
+        requires=["daysSinceIrrigation"],
+        slots=["sinceDays"],
+        text={
+            "en": {
+                "situation": "You irrigated {sinceDays} ago.",
+                "action": "Do not irrigate again yet. Dig to spade depth first and "
+                          "water only if the soil is dry to the touch down there.",
+                "reason": "The satellite's soil-water reading lags a fresh irrigation "
+                          "by several days, so it still shows this field as dry. Your "
+                          "own record is the better guide today.",
+            },
+            "hi": {
+                "situation": "आपने {sinceDays} पहले सिंचाई की थी।",
+                "action": "अभी दोबारा सिंचाई न करें। पहले कुदाल जितनी गहराई पर मिट्टी "
+                          "देखें — वहाँ सूखी लगे तभी पानी दें।",
+                "reason": "उपग्रह की मिट्टी-नमी की रीडिंग ताज़ा सिंचाई को कुछ दिन बाद "
+                          "पकड़ती है, इसलिए वह अब भी खेत को सूखा दिखा रही है। आज आपका "
+                          "अपना रिकॉर्ड ज़्यादा भरोसेमंद है।",
+            },
+            "pt": {
+                "situation": "Você irrigou há {sinceDays}.",
+                "action": "Não irrigue de novo ainda. Cave até a profundidade de uma "
+                          "pá e só regue se estiver seco ali embaixo.",
+                "reason": "A leitura de umidade do solo por satélite demora alguns "
+                          "dias para registrar uma irrigação recente, então ainda "
+                          "mostra a lavoura seca. Hoje o seu próprio registro vale mais.",
+            },
+        },
+    ),
+    _t(
         "irrigation.watch", "irrigation", ROUTINE,
         requires=["waterBalance7dMm", "rootzoneWater"],
         slots=["deficitMm", "depthMm"],
@@ -256,7 +302,7 @@ TEMPLATES: tuple[Template, ...] = (
         stages=["vegetative"],
         text={
             "en": {
-                "situation": "Your crop is {days} days from sowing, in its main "
+                "situation": "Your crop is {days} from sowing, in its main "
                              "growth phase.",
                 "action": "Spread {ureaKgPerHa} kg of urea per hectare, then irrigate "
                           "lightly to wash it in.",
@@ -265,7 +311,7 @@ TEMPLATES: tuple[Template, ...] = (
                           "rate — check your Soil Health Card before you buy.",
             },
             "hi": {
-                "situation": "बुवाई को {days} दिन हो चुके हैं — फसल अपनी मुख्य "
+                "situation": "बुवाई को {days} हो चुके हैं — फसल अपनी मुख्य "
                              "बढ़वार में है।",
                 "action": "{ureaKgPerHa} किलो यूरिया प्रति हेक्टेयर डालें, फिर हल्की "
                           "सिंचाई करके उसे मिट्टी में बैठा दें।",
@@ -274,13 +320,123 @@ TEMPLATES: tuple[Template, ...] = (
                           "से पहले मृदा स्वास्थ्य कार्ड देख लें।",
             },
             "pt": {
-                "situation": "A lavoura está com {days} dias após a semeadura, na fase "
+                "situation": "A lavoura está com {days} após a semeadura, na fase "
                              "de crescimento.",
                 "action": "Aplique {ureaKgPerHa} kg de ureia por hectare e faça uma "
                           "irrigação leve para incorporá-la.",
                 "reason": "É cerca de um terço do nitrogênio da safra de {cropLabel}, a "
                           "parcela usual neste estádio. É uma dose geral — confirme com "
                           "sua análise de solo antes de comprar.",
+            },
+        },
+    ),
+    _t(
+        "fertiliser.next_split_due", "fertiliser", ADVISORY,
+        # Only the date is required. A farmer who did not say what they spread
+        # still gets the timing, and the sentence calls it "fertiliser".
+        requires=["daysSinceNitrogen"],
+        slots=["sinceDays", "dueInDays", "product"],
+        # Same stages as the dose templates it stands in for: this is the card
+        # a farmer sees *instead of* a top-dressing instruction, so it belongs
+        # wherever that instruction would have belonged.
+        stages=["establishment", "vegetative"],
+        text={
+            "en": {
+                "situation": "You applied {product} {sinceDays} ago.",
+                "action": "Do not spread more nitrogen yet. The next split is due in "
+                          "about {dueInDays}.",
+                "reason": "Nitrogen applied too close together is lost to the air and "
+                          "past the roots before the crop can use it — the second bag "
+                          "does the work of half a bag.",
+            },
+            "hi": {
+                "situation": "आपने {sinceDays} पहले {product} डाली थी।",
+                "action": "अभी और नाइट्रोजन न डालें। अगली मात्रा लगभग {dueInDays} "
+                          "बाद देनी है।",
+                "reason": "बहुत कम अंतर पर डाली गई नाइट्रोजन फसल के काम आने से पहले "
+                          "हवा में उड़ जाती है या जड़ों से नीचे चली जाती है — दूसरी "
+                          "बोरी आधी बोरी जितना ही काम करती है।",
+            },
+            "pt": {
+                "situation": "Você aplicou {product} há {sinceDays}.",
+                "action": "Não aplique mais nitrogênio ainda. A próxima parcela é "
+                          "daqui a cerca de {dueInDays}.",
+                "reason": "Nitrogênio aplicado com pouco intervalo se perde para o ar "
+                          "e abaixo das raízes antes de a lavoura aproveitá-lo — o "
+                          "segundo saco rende metade.",
+            },
+        },
+    ),
+    _t(
+        "fertiliser.topdress_adjusted", "fertiliser", ADVISORY,
+        requires=["ureaRemainingKgPerHa", "nitrogenAppliedKgPerHa",
+                  "seasonNitrogenKgPerHa", "cropLabel"],
+        slots=["ureaKgPerHa", "appliedN", "seasonN", "cropLabel"],
+        stages=["establishment", "vegetative"],
+        text={
+            "en": {
+                "situation": "You have put on about {appliedN} kg of nitrogen per "
+                             "hectare so far, of roughly {seasonN} kg for the season.",
+                "action": "Spread {ureaKgPerHa} kg of urea per hectare, then irrigate "
+                          "lightly to wash it in.",
+                "reason": "That is the balance of {cropLabel}'s season nitrogen worked "
+                          "out from what you told us you already applied, rather than "
+                          "a standard rate — so it is only as right as that answer.",
+            },
+            "hi": {
+                "situation": "अब तक आपने लगभग {appliedN} किलो नाइट्रोजन प्रति हेक्टेयर "
+                             "डाली है, पूरे मौसम के करीब {seasonN} किलो में से।",
+                "action": "{ureaKgPerHa} किलो यूरिया प्रति हेक्टेयर डालें, फिर हल्की "
+                          "सिंचाई करके उसे मिट्टी में बैठा दें।",
+                "reason": "यह {cropLabel} की मौसम भर की नाइट्रोजन का बचा हुआ हिस्सा "
+                          "है, जो आपके बताए अनुसार निकाला गया है, कोई आम दर नहीं — "
+                          "यानी यह उतना ही सही है जितना आपका जवाब।",
+            },
+            "pt": {
+                "situation": "Você já aplicou cerca de {appliedN} kg de nitrogênio por "
+                             "hectare, de aproximadamente {seasonN} kg da safra.",
+                "action": "Aplique {ureaKgPerHa} kg de ureia por hectare e faça uma "
+                          "irrigação leve para incorporá-la.",
+                "reason": "É o saldo do nitrogênio de {cropLabel} nesta safra, "
+                          "calculado a partir do que você informou, e não uma dose "
+                          "padrão — vale o quanto valer essa resposta.",
+            },
+        },
+    ),
+    _t(
+        "fertiliser.season_n_complete", "fertiliser", ADVISORY,
+        requires=["nitrogenAppliedKgPerHa", "seasonNitrogenKgPerHa", "cropLabel"],
+        slots=["appliedN", "seasonN", "cropLabel"],
+        text={
+            "en": {
+                "situation": "You have applied about {appliedN} kg of nitrogen per "
+                             "hectare. {cropLabel} needs roughly {seasonN} kg for the "
+                             "whole season.",
+                "action": "Do not buy more urea for this crop. Put that money into "
+                          "next season's seed instead.",
+                "reason": "Past the season's requirement, extra nitrogen softens the "
+                          "stem and the crop goes down in the first strong wind. It "
+                          "takes yield away rather than adding it.",
+            },
+            "hi": {
+                "situation": "आपने लगभग {appliedN} किलो नाइट्रोजन प्रति हेक्टेयर डाल "
+                             "दी है। {cropLabel} को पूरे मौसम में करीब {seasonN} किलो "
+                             "चाहिए।",
+                "action": "इस फसल के लिए और यूरिया न ख़रीदें। वह पैसा अगले मौसम के बीज "
+                          "में लगाएँ।",
+                "reason": "ज़रूरत से ज़्यादा नाइट्रोजन से तना कमज़ोर पड़ जाता है और "
+                          "पहली तेज़ हवा में फसल गिर जाती है — पैदावार बढ़ने की जगह "
+                          "घट जाती है।",
+            },
+            "pt": {
+                "situation": "Você já aplicou cerca de {appliedN} kg de nitrogênio por "
+                             "hectare. {cropLabel} pede cerca de {seasonN} kg na safra "
+                             "inteira.",
+                "action": "Não compre mais ureia para esta lavoura. Guarde o dinheiro "
+                          "para a semente da próxima safra.",
+                "reason": "Acima da exigência da safra, o nitrogênio extra amolece o "
+                          "colmo e a lavoura acama no primeiro vento forte. Tira "
+                          "produtividade em vez de somar.",
             },
         },
     ),
@@ -448,7 +604,7 @@ TEMPLATES: tuple[Template, ...] = (
         conflicts=["irrigation", "protection.heat_stress"],
         text={
             "en": {
-                "situation": "Your crop is {days} days from sowing and close to "
+                "situation": "Your crop is {days} from sowing and close to "
                              "harvest.",
                 "action": "Stop irrigating now. Harvest when a grain is hard and "
                           "your thumbnail leaves no mark on it.",
@@ -456,14 +612,14 @@ TEMPLATES: tuple[Template, ...] = (
                           "spoils in storage.",
             },
             "hi": {
-                "situation": "बुवाई को {days} दिन हो चुके हैं — कटाई नज़दीक है।",
+                "situation": "बुवाई को {days} हो चुके हैं — कटाई नज़दीक है।",
                 "action": "अब सिंचाई बंद कर दें। दाना जाँचें: जब नाखून से दबाने पर "
                           "निशान न पड़े, तब कटाई करें।",
                 "reason": "इस समय पानी देने से पैदावार नहीं बढ़ती, और नमी वाली फसल "
                           "भंडारण में ख़राब हो जाती है।",
             },
             "pt": {
-                "situation": "A lavoura está com {days} dias após a semeadura e perto "
+                "situation": "A lavoura está com {days} após a semeadura e perto "
                              "da colheita.",
                 "action": "Pare de irrigar agora. Colha quando o grão estiver duro e a "
                           "unha não deixar marca.",

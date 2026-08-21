@@ -13,10 +13,12 @@ import '../../../core/l10n/app_language.dart';
 import '../../../core/l10n/language_scope.dart';
 import '../data/field_repository.dart';
 import '../domain/crop.dart';
+import '../domain/field_history.dart';
 import '../domain/geometry.dart';
 import 'widgets/coordinate_sheet.dart';
 import 'home_screen.dart';
 import 'widgets/crop_picker.dart';
+import 'widgets/field_history_input.dart';
 import 'widgets/field_map_view.dart';
 import 'widgets/soil_card_input.dart';
 
@@ -58,6 +60,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// simply not offered — which is the correct outcome for a field nobody has
   /// told us about.
   DateTime? _sowingDate;
+
+  /// Optional throughout — the confirm button never waits on it. Its whole
+  /// job is to stop M1 recommending something the field has already had.
+  FieldHistory _history = const FieldHistory();
 
   /// ISO yyyy-mm-dd, or null. The shape M0 stores and M1 reads.
   String? get _sowingDateIso =>
@@ -189,6 +195,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               seededSoil: soilCard,
               crop: crop,
               sowingDate: _sowingDateIso,
+              fertiliserLog: _history.log,
+              lastIrrigation: _history.lastIrrigationIso,
             )
           : await widget.repository.profileForPin(
               lat: _lat,
@@ -196,6 +204,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               seededSoil: soilCard,
               crop: crop,
               sowingDate: _sowingDateIso,
+              fertiliserLog: _history.log,
+              lastIrrigation: _history.lastIrrigationIso,
             );
 
       if (!mounted) return;
@@ -376,6 +386,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
+                FieldHistoryInput(
+                  history: _history,
+                  onChanged: (history) => setState(() => _history = history),
+                ),
                 SoilCardInput(
                   phosphorus: _phosphorus,
                   potassium: _potassium,

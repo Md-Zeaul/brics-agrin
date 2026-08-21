@@ -35,6 +35,9 @@ class M0Client {
   /// M0, whose health rule ranks against neighbours regardless of crop.
   /// [sowingDate] is likewise recorded rather than used: M1 needs it to place
   /// the crop in its growth stage, and M0 measures nothing that reveals one.
+  /// [fertiliserLog] and [lastIrrigation] are the same kind of fact — things
+  /// only the farmer knows, which stop M1 recommending a dose or an irrigation
+  /// the field has already had.
   Future<FieldProfile> buildProfile({
     ({double lat, double lng})? pin,
     List<List<double>>? polygon,
@@ -44,6 +47,8 @@ class M0Client {
     Map<String, dynamic>? seededSoil,
     Map<String, dynamic>? crop,
     String? sowingDate,
+    List<Map<String, dynamic>>? fertiliserLog,
+    String? lastIrrigation,
     Duration timeout = const Duration(seconds: 60),
   }) async {
     assert(pin != null || polygon != null, 'need a pin or a polygon');
@@ -58,6 +63,9 @@ class M0Client {
       'seededSoil': ?seededSoil,
       'crop': ?crop,
       'sowingDate': ?sowingDate,
+      if (fertiliserLog != null && fertiliserLog.isNotEmpty)
+        'fertiliserLog': fertiliserLog,
+      'lastIrrigation': ?lastIrrigation,
     });
 
     late final http.Response response;

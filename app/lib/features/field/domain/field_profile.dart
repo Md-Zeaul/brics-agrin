@@ -162,6 +162,8 @@ class FieldProfile {
     required this.areaHa,
     this.boundaryMode = 'pin',
     this.sowingDate,
+    this.fertiliserLog = const [],
+    this.lastIrrigation,
     this.crop,
     required this.soil,
     required this.healthChip,
@@ -200,6 +202,17 @@ class FieldProfile {
   /// to it, and M1's fertiliser advice depends on it. Stored on the profile
   /// rather than in app state so a cache resume does not lose it.
   final String? sowingDate;
+
+  /// What the farmer says they have already put on this field this season,
+  /// most recent last. Each entry is `{date, product?, bagsPerAcre?}` — the
+  /// last two optional, because a date alone already fixes the timing and
+  /// refusing an incomplete answer collects nothing at all.
+  final List<Map<String, dynamic>> fertiliserLog;
+
+  /// ISO date the field was last watered. Soil-water reanalysis lags a fresh
+  /// irrigation by days, so without this the advisory can recommend water that
+  /// is already in the ground.
+  final String? lastIrrigation;
 
   /// True when [areaHa] came from the farmer's own boundary rather than the
   /// 1.5 ha default. The UI must not present the two alike.
@@ -249,6 +262,11 @@ class FieldProfile {
       boundaryMode: json['boundaryMode'] as String? ?? 'pin',
       crop: (json['crop'] as Map?)?.cast<String, dynamic>(),
       sowingDate: json['sowingDate'] as String?,
+      fertiliserLog: ((json['fertiliserLog'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => e.cast<String, dynamic>())
+          .toList(),
+      lastIrrigation: json['lastIrrigation'] as String?,
       soil: Soil.fromJson(json['soil'] as Map<String, dynamic>? ?? const {}),
       healthChip: HealthChip.parse(json['healthChip'] as String?),
       ndvi: _toDouble(json['ndvi']),
@@ -287,6 +305,8 @@ class FieldProfile {
         'boundaryMode': boundaryMode,
         'crop': crop,
         'sowingDate': sowingDate,
+        'fertiliserLog': fertiliserLog,
+        'lastIrrigation': lastIrrigation,
         'ndvi': ndvi,
         'ndviPercentile': ndviPercentile,
         'neighbourhoodMedianNdvi': neighbourhoodMedianNdvi,

@@ -86,6 +86,39 @@ def urea_topdress_kg_per_ha(crop_id: str | None) -> int | None:
     return _round_to(urea, 5)
 
 
+def remaining_topdress_kg_per_ha(crop_id: str | None, applied_n_kg_per_ha: float) -> int | None:
+    """Urea for the next top-dressing once what is already in the ground is
+    subtracted, kg/ha. None when the crop has no rate, as above.
+
+    The season total is the budget and the farmer's own report is the spend.
+    Two things follow that the unadjusted rate gets wrong:
+
+    A farmer who put two bags of urea per acre on wheat at first irrigation has
+    already had 102 of the season's 120 kg of nitrogen. The standard third —
+    another 85 kg of urea — would take them to nearly double the recommendation,
+    which buys lodging and nitrate leaching rather than yield.
+
+    A farmer who put two bags of DAP per acre has had 44 kg, a third of the
+    budget, and is due close to a normal split.
+
+    Returns 0 when the budget is spent. That is an answer, not an error: "do
+    not buy more urea this season" is worth a card of its own.
+    """
+    crop = (crop_id or "").lower()
+    if crop in FIXES_OWN_NITROGEN:
+        return None
+    season_n = NITROGEN_KG_PER_HA.get(crop)
+    if season_n is None:
+        return None
+
+    remaining_n = max(0.0, season_n - max(0.0, applied_n_kg_per_ha))
+    # Never more than a normal split in one go, however much budget is left —
+    # the reason nitrogen is split at all is that a crop cannot take up the
+    # season's supply at once, and an unspent budget does not change that.
+    this_dose_n = min(remaining_n, season_n * TOPDRESS_FRACTION)
+    return _round_to(this_dose_n / UREA_N_FRACTION, 5)
+
+
 def total_kg(kg_per_ha: int, area_ha: float) -> int:
     """What to actually carry to the field, rounded to a practical 5 kg."""
     return _round_to(kg_per_ha * area_ha, 5)

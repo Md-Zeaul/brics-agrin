@@ -1,7 +1,8 @@
 # Working on AgriSetu
 
-Two people, six days, one demo. This file exists so the second person does not
-spend a morning rediscovering what the first one already worked out.
+One developer, six days, one demo. This file exists so a fresh terminal — or a
+fresh morning — does not spend an hour rediscovering what was already worked
+out.
 
 ## Setup, start to finish
 
@@ -70,44 +71,63 @@ Both suites must be green before you push.
 
 There is no pytest in this project. `python3 -m unittest` is the runner.
 
-## Who owns what
+**If an edit seems not to take effect**, clear the bytecode cache. This venv is
+built on macOS's system Python, which sets `sys.pycache_prefix` — so `.pyc`
+files live outside the repo and deleting `__pycache__` here does nothing:
 
-Modules are owned whole, not file by file. Work inside your own and the two of
-us almost never touch the same file.
+    rm -rf ~/Library/Caches/com.apple.python$PWD
 
-| Module | Screens | Owner | Fidelity for the demo |
+Python invalidates that cache on the source file's size and mtime, and mtime
+has one-second resolution. A scripted edit that changes neither — `bag_kg=45`
+to `bag_kg=50`, say — is invisible to it, and the old code keeps running while
+the file on disk reads correctly.
+
+## Module order, and what each one owes the demo
+
+Nine modules land on ten screens. They are listed in build order, not module
+order: the ordering is by what the five-minute demo cannot proceed without.
+
+| Module | Screens | State | Fidelity for the demo |
 |---|---|---|---|
-| M0 Field Intelligence | S1, S2 | @Md-Zeaul | Live — Earth Engine |
-| M1 AI Farmer Copilot | S2 | @Md-Zeaul | Live — Gemini, STT/TTS/Translate |
-| M2 Disease Diagnostic | S3, S4 | @herambskanda | Live — Vertex Vision, TFLite offline |
-| M3 Regenerative Advisor | S5 | @Md-Zeaul | Live rules over real field data |
-| M4 Seed Intelligence | S5 | @herambskanda | Seeded DB of real varieties |
-| M5 Nervous System | S7, S8 | @herambskanda | Seeded tiles + one live signal |
-| M6 Economic Engine | S9 | @herambskanda | Seeded scenario |
-| M7 Federated Agri-DPI | S10 | @herambskanda | Mock — 20% of the score |
-| M8 Farm Digital Twin | S6 | @Md-Zeaul | Live-ish simulator |
+| M0 Field Intelligence | S1, S2 | **built** | Live — Earth Engine, six sources |
+| M1 AI Farmer Copilot | S2 | **built** | Live — Vertex Gemini, rules fallback |
+| M2 Disease Diagnostic | S3, S4 | to build | Live — Vertex Vision, TFLite offline |
+| M3 Regenerative Advisor | S5 | to build | Live rules over real field data |
+| M4 Seed Intelligence | S5 | to build | Seeded DB of real varieties |
+| M8 Farm Digital Twin | S6 | to build | Live-ish simulator over M3 |
+| M5 Nervous System | S7, S8 | to build | Seeded tiles + one live signal |
+| M6 Economic Engine | S9 | to build | Seeded scenario |
+| M7 Federated Agri-DPI | S10 | to build | Mock — 20% of the score |
 
-Directory layout follows that table, so the folder you are in tells you whose
-code it is:
+Directory layout follows the module split, so the folder you are in tells you
+which module you are inside:
 
-    app/lib/features/field/            M0 — S1, S2
+    app/lib/features/field/            M0, M1 — S1, S2
     app/lib/features/diagnosis/        M2 — S3, S4
     app/lib/features/planner/          M3, M4, M8 — S5, S6
     app/lib/features/command_center/   M5, M6, M7 — S7 to S10
     app/lib/core/                      shell: routes, language, config
     backend/m0_field/                  M0
+    backend/m1_advisory/               M1
 
-### The two seams that need agreeing, not assuming
+### The two seams worth designing before writing
 
-**S5 has three owners.** M3's ranked table, M4's seed variety and M1's one-line
-reason all land on one screen. M4 ships as a pure lookup —
-`recommend_seed(crop, zone, traits) -> variety` plus its data rows — and
-@Md-Zeaul renders the screen. M4's owner does not open `planner_screen.dart`.
+These were coordination problems when two people were building. With one, they
+are still design problems — the cost just moved from a merge conflict to a
+rewrite.
 
-**Language is shared.** `app/lib/core/l10n/` is the one mechanism, used by M1
-for the spoken advisory and by M7 for the Portuguese flip. Add your strings in
-your own section of `strings.dart`; English is required, the other two degrade
-to English when missing. Do not build a second language mechanism.
+**S5 carries three modules.** M3's ranked table, M4's seed variety and M1's
+one-line reason all land on one screen. Keep M4 a pure lookup —
+`recommend_seed(crop, zone, traits) -> variety` plus its data rows — so the
+screen has one owner and the data has none.
+
+**`data/seed-data.json` gates four modules.** M4, M5, M6 and M7 all read it and
+none of them can be started without it. It is issue #1 for that reason: one
+data session unlocks a third of what is left.
+
+**Language is one mechanism.** `app/lib/core/l10n/` serves M1's advisory and
+M7's Portuguese flip alike. Add strings to `strings.dart`; English is required,
+the other two degrade to English when missing. Do not build a second one.
 
 ## Branches
 

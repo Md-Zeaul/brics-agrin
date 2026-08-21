@@ -47,9 +47,26 @@ def main() -> int:
     parser.add_argument("--sown", default="2026-06-20", help="ISO sowing date")
     parser.add_argument("--language", default="en", choices=["en", "hi", "pt"])
     parser.add_argument("--today", help="ISO date to evaluate as, for stage arithmetic")
+    parser.add_argument(
+        "--fertilised", metavar="DATE[:PRODUCT[:BAGS_PER_ACRE]]", action="append",
+        default=[],
+        help="an entry in the fertiliser log, repeatable. "
+             "e.g. --fertilised 2026-07-20:urea:1",
+    )
+    parser.add_argument("--irrigated", help="ISO date the field was last watered")
     args = parser.parse_args()
 
     today = date.fromisoformat(args.today) if args.today else date.today()
+
+    log = []
+    for raw in args.fertilised:
+        parts = raw.split(":")
+        entry = {"date": parts[0]}
+        if len(parts) > 1 and parts[1]:
+            entry["product"] = parts[1]
+        if len(parts) > 2 and parts[2]:
+            entry["bagsPerAcre"] = float(parts[2])
+        log.append(entry)
 
     rule("1 · INPUT — what the farmer gave us")
     if args.pin:
@@ -60,13 +77,33 @@ def main() -> int:
             pin={"lat": lat, "lng": lng},
             crop={"id": args.crop, "label": args.crop.title()},
             sowing_date=args.sown,
+            fertiliser_log=log or None,
+            last_irrigation=args.irrigated,
         ).to_dict()
     else:
         profile = json.loads(args.profile.read_text())
         profile["crop"] = {"id": args.crop, "label": args.crop.title()}
+        # A cached profile predates these answers; splice them in so the trace
+        # shows the same advisory a fresh capture would produce.
+        if log:
+            profile["fertiliserLog"] = log
+            profile.setdefault("sources", {})["fertiliserLog"] = {
+                "source": "farmer's own record of what they applied",
+                "status": "reported",
+            }
+        if args.irrigated:
+            profile["lastIrrigation"] = args.irrigated
+            profile.setdefault("sources", {})["lastIrrigation"] = {
+                "source": "farmer", "status": "reported",
+            }
         print(f"   profile       {args.profile}")
     print(f"   crop          {args.crop}")
     print(f"   sown          {args.sown}")
+    for entry in log:
+        print(f"   fertilised    {entry.get('date')}  {entry.get('product', '(not said)')}"
+              f"  {entry.get('bagsPerAcre', '?')} bags/acre")
+    if args.irrigated:
+        print(f"   irrigated     {args.irrigated}")
     print(f"   language      {args.language}")
     print(f"   evaluated as  {today}")
 
@@ -77,7 +114,7 @@ def main() -> int:
         print(f" {mark}{name:14} {status:12} {entry.get('source', '')}")
 
     rule("3 · SIGNALS — what survived, and what a template may therefore use")
-    signals = extract(profile)
+    signals = extract(profile, today)
     for name in sorted(signals):
         signal = signals[name]
         print(f"   {name:26} {str(signal.value):>10}   [{signal.status}]")

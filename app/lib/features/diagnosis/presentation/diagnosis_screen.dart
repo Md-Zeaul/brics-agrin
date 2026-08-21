@@ -1,4 +1,4 @@
-/// S4 — Diagnosis result. M2, owned by @herambskanda.
+/// S4 — Diagnosis result. M2.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,7 +14,7 @@ class DiagnosisScreen extends StatelessWidget {
       screenId: 'S4',
       titleKey: 'diagnosis.title',
       module: 'M2 Disease Diagnostic',
-      owner: 'herambskanda',
+      issue: 3,
       purpose: 'Name the disease, own the uncertainty, and prescribe bio '
           'treatment before chemical.',
       elements: [

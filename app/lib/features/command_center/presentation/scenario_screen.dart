@@ -1,4 +1,4 @@
-/// S9 — National scenario. M6, owned by @herambskanda.
+/// S9 — National scenario. M6.
 library;
 
 import 'package:flutter/material.dart';
@@ -14,7 +14,7 @@ class ScenarioScreen extends StatelessWidget {
       screenId: 'S9',
       titleKey: 'scenario.title',
       module: 'M6 Economic Engine',
-      owner: 'herambskanda',
+      issue: 7,
       purpose: 'Turn a shortfall into a decision with a price on it.',
       elements: [
         'The gap, as a percentage — the brief\'s example is 8% wheat',

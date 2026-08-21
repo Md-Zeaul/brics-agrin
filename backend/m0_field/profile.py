@@ -49,6 +49,8 @@ def build_field_profile(
     ndvi_window: tuple[str, str] | None = None,
     crop: dict | None = None,
     sowing_date: str | None = None,
+    fertiliser_log: list[dict] | None = None,
+    last_irrigation: str | None = None,
 ) -> FieldProfile:
     """Build the profile for one field.
 
@@ -85,6 +87,8 @@ def build_field_profile(
         boundary_mode="drawn" if drawn else "pin",
         crop=crop or None,
         sowing_date=sowing_date or None,
+        fertiliser_log=list(fertiliser_log or []),
+        last_irrigation=last_irrigation or None,
     )
     profile.sources["boundary"] = Provenance(
         source="farmer-drawn polygon" if drawn else "farmer pin",
@@ -99,6 +103,21 @@ def build_field_profile(
             source="farmer",
             status=REPORTED,
             note="used by M1 to place the crop in its growth stage",
+        ).to_dict()
+
+    if fertiliser_log:
+        profile.sources["fertiliserLog"] = Provenance(
+            source="farmer's own record of what they applied",
+            status=REPORTED,
+            note="used by M1 to subtract nitrogen already applied and to hold "
+                 "back a second dose inside the uptake window",
+        ).to_dict()
+
+    if last_irrigation:
+        profile.sources["lastIrrigation"] = Provenance(
+            source="farmer",
+            status=REPORTED,
+            note="used by M1; soil-water reanalysis lags a fresh irrigation by days",
         ).to_dict()
 
     if crop:

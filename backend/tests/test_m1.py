@@ -11,14 +11,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from m1_advisory import doses, gemini, rules  # noqa: E402
+from m1_advisory import doses, gemini, products, rules  # noqa: E402
 from m1_advisory.advisory import RULES_SOURCE, build_advisory  # noqa: E402
 from m1_advisory.signals import extract, value  # noqa: E402
 from m1_advisory.stage import (  # noqa: E402
@@ -28,6 +29,7 @@ from m1_advisory.stage import (  # noqa: E402
     growth_stage,
 )
 from m1_advisory.templates import (  # noqa: E402
+    days_phrase,
     BY_ID,
     INSUFFICIENT_DATA,
     LANGUAGES,
@@ -70,6 +72,10 @@ def profile(**overrides) -> dict:
     }
     base["sources"]["soilNPK"] = {"source": "district default", "status": "seeded"}
     base["sources"]["crop"] = {"source": "farmer", "status": "reported"}
+    # Present unconditionally so a test only has to supply the data. Nothing is
+    # extracted from a provenance entry with no payload behind it.
+    base["sources"]["fertiliserLog"] = {"source": "farmer", "status": "reported"}
+    base["sources"]["lastIrrigation"] = {"source": "farmer", "status": "reported"}
 
     for path, val in overrides.items():
         target = base
@@ -686,3 +692,352 @@ class TestTheCardNeverContradictsItself(unittest.TestCase):
             profile(), language="en", sowing_date=sown, today=TODAY,
             chooser=chooser, chooser_source="test model")
         self.assertEqual(advisory.template_ids, ["harvest.dry_down"])
+
+
+# --- What the farmer has already done to the field --------------------------
+
+def days_ago(n: int) -> str:
+    return (TODAY - timedelta(days=n)).isoformat()
+
+
+def fertilised(days: int, product="urea", bags=None):
+    entry = {"date": days_ago(days), "product": product}
+    if bags is not None:
+        entry["bagsPerAcre"] = bags
+    return entry
+
+
+class TestFertiliserProducts(unittest.TestCase):
+    """The bag is the unit a farmer counts in; kilograms of N is the unit the
+    agronomy is written in. Everything here is that conversion."""
+
+    def test_the_same_quantity_of_different_products_is_not_the_same_dose(self):
+        # This is the whole reason the log records a product. Same answer from
+        # the farmer — "two bags an acre" — and a factor of two in nitrogen.
+        urea = products.nitrogen_kg_per_ha("urea", 2)
+        dap = products.nitrogen_kg_per_ha("dap", 2)
+        self.assertGreater(urea, 100)
+        self.assertLess(dap, 50)
+        self.assertGreater(urea / dap, 2.0)
+
+    def test_urea_bags_are_45_kg_not_50(self):
+        # India cut the urea bag to 45 kg in 2018 while complexes stayed at 50.
+        # Assuming 50 throughout overstates every urea application by 11%.
+        self.assertEqual(products.PRODUCTS["urea"].bag_kg, 45)
+        self.assertEqual(products.PRODUCTS["dap"].bag_kg, 50)
+
+    def test_manure_is_recorded_but_never_quantified(self):
+        # It is spread by the trolley and its analysis depends on what the
+        # animals ate. A nitrogen figure from it would be a guess in the
+        # costume of an analysis.
+        self.assertIsNone(products.nitrogen_kg_per_ha("fym", 2))
+        self.assertTrue(products.supplies_nitrogen("fym"))
+
+    def test_not_remembering_is_an_answer_the_table_accepts(self):
+        self.assertIsNone(products.nitrogen_kg_per_ha("unknown", 2))
+        self.assertIsNotNone(products.label("unknown"))
+
+    def test_an_unremembered_product_is_assumed_to_have_carried_nitrogen(self):
+        # Withholding a dose the crop already had costs a bag. Repeating one it
+        # never had costs a season. The conservative answer is the safe one.
+        self.assertTrue(products.supplies_nitrogen("unknown"))
+        self.assertTrue(products.supplies_nitrogen(None))
+
+    def test_potash_carries_no_nitrogen_so_it_locks_nothing_out(self):
+        self.assertFalse(products.supplies_nitrogen("mop"))
+        self.assertFalse(products.supplies_nitrogen("ssp"))
+
+    def test_every_product_is_labelled_in_every_language(self):
+        for pid in products.PICKER_ORDER:
+            for language in ("en", "hi", "pt"):
+                self.assertTrue(
+                    products.label(pid, language),
+                    f"{pid} has no {language} label",
+                )
+
+    def test_the_picker_offers_exactly_what_the_table_holds(self):
+        self.assertEqual(set(products.PICKER_ORDER), set(products.PRODUCTS))
+
+
+class TestRemainingNitrogen(unittest.TestCase):
+    def test_a_full_season_already_applied_leaves_nothing(self):
+        self.assertEqual(doses.remaining_topdress_kg_per_ha("wheat", 130), 0)
+
+    def test_dap_at_sowing_still_leaves_a_normal_split_due(self):
+        # 1 bag/acre of DAP is 22 kg N against a 120 kg season. Nearly all of
+        # the budget is unspent, so the next dose is a normal one.
+        applied = products.nitrogen_kg_per_ha("dap", 1)
+        self.assertEqual(
+            doses.remaining_topdress_kg_per_ha("wheat", applied),
+            doses.urea_topdress_kg_per_ha("wheat"),
+        )
+
+    def test_a_heavy_urea_application_shrinks_the_next_dose(self):
+        applied = products.nitrogen_kg_per_ha("urea", 2)   # 102 of 120 kg N
+        adjusted = doses.remaining_topdress_kg_per_ha("wheat", applied)
+        self.assertGreater(adjusted, 0)
+        self.assertLess(adjusted, doses.urea_topdress_kg_per_ha("wheat"))
+
+    def test_an_unspent_budget_is_still_never_given_in_one_go(self):
+        # The reason nitrogen is split is that a crop cannot take up a season's
+        # worth at once. Having applied nothing does not change that.
+        self.assertEqual(
+            doses.remaining_topdress_kg_per_ha("wheat", 0),
+            doses.urea_topdress_kg_per_ha("wheat"),
+        )
+
+    def test_a_legume_is_refused_an_adjusted_dose_as_well_as_a_standard_one(self):
+        # The legume guard has to hold on every path to a dose, not just the
+        # first one that was written.
+        self.assertIsNone(doses.remaining_topdress_kg_per_ha("chickpea", 0))
+        self.assertIsNone(doses.urea_topdress_kg_per_ha("chickpea"))
+
+
+class TestHistorySignals(unittest.TestCase):
+    def test_a_date_alone_is_enough_to_fix_the_timing(self):
+        signals = extract(profile(fertiliserLog=[{"date": days_ago(5)}]), TODAY)
+        self.assertEqual(value(signals, "daysSinceFertiliser"), 5)
+        # No product named, so nitrogen is assumed and the lockout applies.
+        self.assertEqual(value(signals, "daysSinceNitrogen"), 5)
+        # But no quantity can be invented from it.
+        self.assertNotIn("nitrogenAppliedKgPerHa", signals)
+
+    def test_a_product_without_a_quantity_names_the_nutrients_only(self):
+        signals = extract(profile(fertiliserLog=[fertilised(5, "dap")]), TODAY)
+        self.assertEqual(value(signals, "lastFertiliserProduct"), "dap")
+        self.assertEqual(value(signals, "phosphorusApplied"), "yes")
+        self.assertNotIn("nitrogenAppliedKgPerHa", signals)
+
+    def test_a_quantity_turns_the_remaining_dose_into_arithmetic(self):
+        signals = extract(
+            profile(fertiliserLog=[fertilised(30, "urea", 2)]), TODAY)
+        self.assertAlmostEqual(
+            value(signals, "nitrogenAppliedKgPerHa"), 102.3, places=1)
+        self.assertIn("ureaRemainingKgPerHa", signals)
+        self.assertLess(
+            value(signals, "ureaRemainingKgPerHa"),
+            value(signals, "ureaTopdressKgPerHa"),
+        )
+
+    def test_the_adjusted_dose_is_seeded_not_reported(self):
+        # The farmer's figure went into the subtraction, but what it was
+        # subtracted from is still a published season rate. Claiming the result
+        # is `reported` would launder a general recommendation into a
+        # measurement of this field.
+        signals = extract(
+            profile(fertiliserLog=[fertilised(30, "urea", 2)]), TODAY)
+        self.assertEqual(signals["ureaRemainingKgPerHa"].status, "seeded")
+        self.assertEqual(signals["nitrogenAppliedKgPerHa"].status, "reported")
+
+    def test_one_unquantified_entry_voids_the_whole_total(self):
+        # A partial sum understates what is in the ground, and the error runs
+        # in the direction that costs the farmer a bag.
+        signals = extract(profile(fertiliserLog=[
+            fertilised(40, "dap", 1),
+            fertilised(30, "urea"),          # no quantity
+        ]), TODAY)
+        self.assertNotIn("nitrogenAppliedKgPerHa", signals)
+        self.assertNotIn("ureaRemainingKgPerHa", signals)
+
+    def test_two_applications_are_summed_which_is_the_real_indian_pattern(self):
+        # DAP at sowing, urea at first irrigation.
+        signals = extract(profile(fertiliserLog=[
+            fertilised(60, "dap", 1),
+            fertilised(30, "urea", 1),
+        ]), TODAY)
+        expected = (products.nitrogen_kg_per_ha("dap", 1)
+                    + products.nitrogen_kg_per_ha("urea", 1))
+        self.assertAlmostEqual(
+            value(signals, "nitrogenAppliedKgPerHa"), expected, places=1)
+
+    def test_days_since_nitrogen_ignores_an_application_that_had_none(self):
+        # Potash three days ago is not a reason to withhold urea.
+        signals = extract(profile(fertiliserLog=[
+            fertilised(40, "urea", 1),
+            fertilised(3, "mop", 1),
+        ]), TODAY)
+        self.assertEqual(value(signals, "daysSinceFertiliser"), 3)
+        self.assertEqual(value(signals, "daysSinceNitrogen"), 40)
+
+    def test_a_future_date_is_rejected_rather_than_counted_backwards(self):
+        future = (TODAY + timedelta(days=3)).isoformat()
+        signals = extract(profile(fertiliserLog=[{"date": future}]), TODAY)
+        self.assertNotIn("daysSinceFertiliser", signals)
+
+    def test_an_unparseable_date_does_not_take_the_advisory_down(self):
+        signals = extract(profile(fertiliserLog=[{"date": "last Tuesday"}]), TODAY)
+        self.assertNotIn("daysSinceFertiliser", signals)
+
+    def test_an_unavailable_source_drops_the_history_like_any_other_signal(self):
+        p = profile(fertiliserLog=[fertilised(5, "urea", 1)])
+        p["sources"]["fertiliserLog"] = {"source": "x", "status": "unavailable"}
+        self.assertNotIn("daysSinceFertiliser", extract(p, TODAY))
+
+    def test_irrigation_date_becomes_a_day_count(self):
+        signals = extract(profile(lastIrrigation=days_ago(2)), TODAY)
+        self.assertEqual(value(signals, "daysSinceIrrigation"), 2)
+        self.assertEqual(signals["daysSinceIrrigation"].status, "reported")
+
+
+class TestTheEngineRemembersWhatWasAlreadyDone(unittest.TestCase):
+    """The point of collecting any of this: advice that does not repeat itself."""
+
+    DRY = {"climate.soilWater": {"0_7cm": 0.12, "7_28cm": 0.2, "28_100cm": 0.15},
+           "rainForecast7dMm": 2.0}
+
+    def advise(self, **overrides):
+        return build_advisory(
+            profile(**overrides), sowing_date=days_ago(50), today=TODAY)
+
+    def test_without_a_log_the_advice_is_what_it_always_was(self):
+        # The whole feature has to be invisible to a farmer who skips it.
+        ids = self.advise().template_ids
+        self.assertNotIn("fertiliser.next_split_due", ids)
+        self.assertNotIn("irrigation.recent", ids)
+
+    def test_a_recent_dose_is_not_repeated(self):
+        ids = self.advise(fertiliserLog=[fertilised(9, "urea", 1)]).template_ids
+        self.assertNotIn("fertiliser.topdress_window", ids)
+        self.assertNotIn("fertiliser.topdress_adjusted", ids)
+        self.assertNotIn("fertiliser.nitrogen_low", ids)
+
+    def test_the_suppression_is_turned_into_advice_rather_than_silence(self):
+        advisory = self.advise(fertiliserLog=[fertilised(9, "urea", 1)])
+        self.assertIn("fertiliser.next_split_due", advisory.template_ids)
+        text = " ".join(advisory.actions)
+        self.assertIn("12", text, "should say when the next split is due")
+
+    def test_the_window_reopens_once_the_crop_can_use_the_next_dose(self):
+        advisory = self.advise(fertiliserLog=[fertilised(25, "urea", 1)])
+        self.assertNotIn("fertiliser.next_split_due", advisory.template_ids)
+        self.assertIn("fertiliser.topdress_adjusted", advisory.template_ids)
+
+    def test_potash_last_week_does_not_hold_back_nitrogen(self):
+        ids = self.advise(fertiliserLog=[fertilised(4, "mop", 1)]).template_ids
+        self.assertNotIn("fertiliser.next_split_due", ids)
+
+    def test_a_spent_budget_says_stop_buying_rather_than_wait(self):
+        # Applied everything, and recently. "The next split is due in 12 days"
+        # would be true of the calendar and wrong about the crop.
+        advisory = self.advise(fertiliserLog=[fertilised(5, "urea", 3)])
+        self.assertIn("fertiliser.season_n_complete", advisory.template_ids)
+        self.assertNotIn("fertiliser.next_split_due", advisory.template_ids)
+
+    def test_the_card_never_quotes_two_different_urea_rates(self):
+        advisory = self.advise(fertiliserLog=[fertilised(30, "urea", 2)])
+        self.assertNotIn("fertiliser.topdress_window", advisory.template_ids)
+        self.assertIn("fertiliser.topdress_adjusted", advisory.template_ids)
+
+    def test_a_field_watered_yesterday_is_not_told_to_water(self):
+        ids = self.advise(lastIrrigation=days_ago(1), **self.DRY).template_ids
+        self.assertNotIn("irrigation.apply", ids)
+
+    def test_and_is_told_why_instead_of_being_told_nothing(self):
+        advisory = self.advise(lastIrrigation=days_ago(1), **self.DRY)
+        self.assertIn("irrigation.recent", advisory.template_ids)
+
+    def test_a_field_watered_a_week_ago_is_still_told_to_water(self):
+        ids = self.advise(lastIrrigation=days_ago(8), **self.DRY).template_ids
+        self.assertIn("irrigation.apply", ids)
+        self.assertNotIn("irrigation.recent", ids)
+
+    def test_a_legume_grower_is_never_given_an_adjusted_dose_either(self):
+        advisory = self.advise(
+            **{"crop": {"id": "chickpea", "label": "Chickpea"},
+               "fertiliserLog": [fertilised(30, "urea", 1)]})
+        for template_id in advisory.template_ids:
+            self.assertFalse(
+                template_id.startswith("fertiliser.topdress"),
+                f"{template_id} quotes urea to a nitrogen-fixing legume",
+            )
+
+    def test_what_the_farmer_reported_is_named_in_the_provenance(self):
+        # The card has to be able to answer "how do you know?" with the
+        # farmer's own answer, marked as theirs rather than as a measurement.
+        advisory = self.advise(fertiliserLog=[fertilised(9, "urea", 1)])
+        used = {s["name"]: s["status"] for s in advisory.signals_used}
+        self.assertEqual(used.get("daysSinceNitrogen"), "reported")
+
+    def test_every_new_template_renders_in_every_language(self):
+        cases = {
+            "fertiliser.next_split_due": {"fertiliserLog": [fertilised(9, "urea", 1)]},
+            "fertiliser.topdress_adjusted": {"fertiliserLog": [fertilised(30, "urea", 2)]},
+            "fertiliser.season_n_complete": {"fertiliserLog": [fertilised(5, "urea", 3)]},
+            "irrigation.recent": dict(lastIrrigation=days_ago(1), **self.DRY),
+        }
+        for template_id, overrides in cases.items():
+            for language in ("en", "hi", "pt"):
+                advisory = build_advisory(
+                    profile(**overrides), language=language,
+                    sowing_date=days_ago(50), today=TODAY)
+                self.assertIn(template_id, advisory.template_ids,
+                              f"{template_id} not chosen for {language}")
+                rendered = " ".join([advisory.headline, advisory.reason,
+                                     *advisory.actions])
+                self.assertNotIn("{", rendered, f"unfilled slot in {language}")
+                self.assertTrue(rendered.strip())
+
+
+class TestTheProductListsCannotDrift(unittest.TestCase):
+    """The picker is in Dart and the nutrient analysis is in Python.
+
+    A product added to one and not the other fails in the worst way available:
+    the app offers an id the backend does not recognise, `nitrogen_kg_per_ha`
+    returns None for it, and the advisory silently drops to a general rate
+    without anything looking broken. Cheaper to catch here.
+    """
+
+    DART = (Path(__file__).resolve().parents[2] / "app" / "lib" / "features"
+            / "field" / "domain" / "field_history.dart")
+
+    def dart_ids(self) -> list[str]:
+        source = self.DART.read_text()
+        block = source.split("kFertiliserProducts = [")[1].split("];")[0]
+        return re.findall(r"id: '([a-z0-9_]+)'", block)
+
+    def test_the_app_offers_exactly_what_the_backend_can_price(self):
+        self.assertTrue(self.DART.is_file(), f"{self.DART} moved")
+        self.assertEqual(self.dart_ids(), list(products.PICKER_ORDER))
+
+    def test_the_app_disables_quantity_for_exactly_what_cannot_be_weighed(self):
+        source = self.DART.read_text()
+        block = source.split("kUnquantifiableProducts = {")[1].split("}")[0]
+        dart = set(re.findall(r"'([a-z0-9_]+)'", block))
+        backend = {pid for pid in products.PICKER_ORDER
+                   if not products.PRODUCTS[pid].is_quantifiable}
+        self.assertEqual(dart, backend)
+
+
+class TestDayCountsReadLikeSentences(unittest.TestCase):
+    """"You irrigated 1 days ago" is the default case of the irrigation card,
+    not an edge one — irrigated yesterday is exactly when it fires."""
+
+    def test_one_day_is_singular_in_every_language(self):
+        self.assertEqual(days_phrase(1, "en"), "1 day")
+        self.assertEqual(days_phrase(1, "pt"), "1 dia")
+        # Hindi does not inflect दिन here; the entry exists so the lookup is
+        # total, not because it says something.
+        self.assertEqual(days_phrase(1, "hi"), "1 दिन")
+
+    def test_more_than_one_is_plural(self):
+        self.assertEqual(days_phrase(9, "en"), "9 days")
+        self.assertEqual(days_phrase(9, "pt"), "9 dias")
+
+    def test_zero_is_plural_which_is_what_english_does(self):
+        self.assertEqual(days_phrase(0, "en"), "0 days")
+
+    def test_an_unknown_language_falls_back_rather_than_raising(self):
+        self.assertEqual(days_phrase(3, "zz"), "3 days")
+
+    def test_the_card_never_says_one_days(self):
+        for language in ("en", "hi", "pt"):
+            advisory = build_advisory(
+                profile(lastIrrigation=days_ago(1),
+                        **{"climate.soilWater": {"0_7cm": 0.12, "7_28cm": 0.2,
+                                                 "28_100cm": 0.15},
+                           "rainForecast7dMm": 2.0}),
+                language=language, sowing_date=days_ago(50), today=TODAY,
+            )
+            self.assertIn("irrigation.recent", advisory.template_ids)
+            self.assertNotIn("1 days", advisory.headline)
+            self.assertNotIn("1 dias", advisory.headline)

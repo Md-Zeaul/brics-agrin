@@ -163,13 +163,15 @@ void main() {
       }
     });
 
-    testWidgets('a stub names the module and its owner', (tester) async {
-      // The point of the stub is that whoever opens it knows whose it is.
+    testWidgets('a stub names the module and where its scope is written',
+        (tester) async {
+      // The point of the stub is that opening it tells you what is missing and
+      // where the spec for it lives, rather than only that something is.
       await tester.pumpWidget(_app());
       await tester.tap(find.text('Scan crop'));
       await tester.pumpAndSettle();
       expect(find.text('M2 Disease Diagnostic'), findsOneWidget);
-      expect(find.textContaining('@herambskanda'), findsOneWidget);
+      expect(find.textContaining('issue #3'), findsOneWidget);
     });
   });
 }
