@@ -133,6 +133,13 @@ def _ask(chooser, candidates, signals, context) -> tuple | None:
     secondary = by_id.get(secondary_id)
     if secondary is not None and secondary.topic == primary.topic:
         secondary = None  # two irrigation actions is one action, said twice
+    if secondary is not None and secondary.primary_only:
+        secondary = None
+    if secondary is not None and primary.conflicts_with(secondary):
+        # The model is choosing, not authoring, but it can still pair two
+        # recommendations that contradict each other. The pairing rule is not
+        # its to override.
+        secondary = None
     return primary, secondary
 
 

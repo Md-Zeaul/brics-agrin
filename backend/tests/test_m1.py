@@ -580,3 +580,109 @@ class TestGeminiResponseHandling(unittest.TestCase):
         chooser = gemini.GeminiChooser(project="p")
         self.assertIsNone(chooser.last_reason)
         self.assertIn("last_reason", vars(chooser))
+
+
+class TestStageChangesTheAdvice(unittest.TestCase):
+    """The sowing date is not decoration — it decides what may be said."""
+
+    def _advice(self, days_after_sowing, **overrides):
+        from datetime import timedelta
+        sown = (TODAY - timedelta(days=days_after_sowing)).isoformat()
+        p = profile(**overrides)
+        return build_advisory(p, language="en", sowing_date=sown, today=TODAY)
+
+    def _eligible(self, days_after_sowing, **overrides):
+        from datetime import timedelta
+        sown = (TODAY - timedelta(days=days_after_sowing)).isoformat()
+        signals = extract(profile(**overrides))
+        stage, days = growth_stage("wheat", sown, TODAY)
+        return {t.id for t in rules.eligible(signals, stage, days)}, stage
+
+    def test_nitrogen_is_offered_during_growth(self):
+        eligible, stage = self._eligible(40, **{"soil.n": 0.6}, ndviPercentile=0.1)
+        self.assertEqual(stage, VEGETATIVE)
+        self.assertIn("fertiliser.nitrogen_low", eligible)
+
+    def test_nitrogen_is_never_offered_at_grain_fill(self):
+        # The crop can no longer take it up, it delays maturity and costs grain
+        # quality — and the thin canopy that triggers the rule is, by then,
+        # ordinary senescence rather than hunger.
+        eligible, stage = self._eligible(110, **{"soil.n": 0.6}, ndviPercentile=0.1)
+        self.assertEqual(stage, "filling")
+        self.assertNotIn("fertiliser.nitrogen_low", eligible)
+
+    def test_nitrogen_is_never_offered_when_the_stage_is_unknown(self):
+        eligible, stage = self._eligible(400, **{"soil.n": 0.6}, ndviPercentile=0.1)
+        self.assertEqual(stage, UNKNOWN)
+        self.assertNotIn("fertiliser.nitrogen_low", eligible)
+
+    def test_a_ripening_field_is_not_flagged_as_a_failing_one(self):
+        eligible, stage = self._eligible(130, ndviPercentile=0.05)
+        self.assertEqual(stage, "maturity")
+        self.assertNotIn("canopy.behind_neighbours", eligible)
+
+    def test_harvest_advice_appears_only_at_maturity(self):
+        at_maturity, _ = self._eligible(130)
+        self.assertIn("harvest.dry_down", at_maturity)
+        mid_season, _ = self._eligible(62)
+        self.assertNotIn("harvest.dry_down", mid_season)
+
+    def test_the_advice_actually_changes_across_the_season(self):
+        # If every stage gave the same card, the date would be decoration.
+        seen = {tuple(self._advice(d).template_ids) for d in (40, 110, 130)}
+        self.assertGreater(len(seen), 1)
+
+
+class TestTheCardNeverContradictsItself(unittest.TestCase):
+    """Two actions on one card have to be doable together."""
+
+    def test_stop_irrigating_never_shares_a_card_with_irrigate(self):
+        from datetime import timedelta
+        sown = (TODAY - timedelta(days=130)).isoformat()
+        advisory = build_advisory(
+            profile(), language="en", sowing_date=sown, today=TODAY)
+        self.assertIn("harvest.dry_down", advisory.template_ids)
+        for template_id in advisory.template_ids:
+            self.assertNotEqual(BY_ID[template_id].topic, "irrigation")
+
+    def test_conflict_is_symmetric(self):
+        # Declared on one side only; it must bind from either direction.
+        harvest = BY_ID["harvest.dry_down"]
+        watch = BY_ID["irrigation.watch"]
+        self.assertTrue(harvest.conflicts_with(watch))
+        self.assertTrue(watch.conflicts_with(harvest))
+
+    def test_hold_irrigation_never_shares_a_card_with_when_to_irrigate(self):
+        hold = BY_ID["irrigation.hold"]
+        heat = BY_ID["protection.heat_stress"]
+        self.assertTrue(hold.conflicts_with(heat))
+
+    def test_nothing_needs_doing_is_never_a_second_line(self):
+        # "Stop irrigating now" followed by "no change this week" reads as an
+        # app arguing with itself.
+        self.assertTrue(BY_ID["canopy.healthy"].primary_only)
+        from datetime import timedelta
+        for days in (11, 40, 80, 110, 130):
+            sown = (TODAY - timedelta(days=days)).isoformat()
+            advisory = build_advisory(
+                profile(), language="en", sowing_date=sown, today=TODAY)
+            if len(advisory.template_ids) > 1:
+                self.assertNotIn("canopy.healthy", advisory.template_ids[1:],
+                                 f"at {days} days")
+
+    def test_a_model_pairing_a_contradiction_is_overruled(self):
+        # The model chooses among eligible templates, but the pairing rule is
+        # not its to override.
+        from datetime import timedelta
+        sown = (TODAY - timedelta(days=130)).isoformat()
+
+        def chooser(eligible, signals, context):
+            ids = [t.id for t in eligible]
+            if "harvest.dry_down" in ids and "irrigation.watch" in ids:
+                return "harvest.dry_down", "irrigation.watch"
+            return ids[0], None
+
+        advisory = build_advisory(
+            profile(), language="en", sowing_date=sown, today=TODAY,
+            chooser=chooser, chooser_source="test model")
+        self.assertEqual(advisory.template_ids, ["harvest.dry_down"])

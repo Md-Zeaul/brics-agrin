@@ -45,6 +45,29 @@ class Template:
     text: dict[str, dict[str, str]]
     stages: tuple[str, ...] = ()   # empty means any stage, including unknown
 
+    # Templates that must never appear on the same card as this one. Entries
+    # match another template's id or its topic.
+    #
+    # A different topic is not enough to make two actions compatible: "stop
+    # irrigating now" and "irrigate 25 mm" are harvest advice and irrigation
+    # advice, and a card carrying both is worse than a card carrying neither.
+    # Contradiction is what a farmer remembers about an app.
+    conflicts: tuple[str, ...] = ()
+
+    # True for the "nothing needs doing" card. It is a complete advisory on its
+    # own and never a second line beside a real instruction — "stop irrigating
+    # now" followed by "no change this week" reads as an app arguing with
+    # itself.
+    primary_only: bool = False
+
+    def conflicts_with(self, other: "Template") -> bool:
+        return (
+            other.id in self.conflicts
+            or other.topic in self.conflicts
+            or self.id in other.conflicts
+            or self.topic in other.conflicts
+        )
+
     @property
     def rank(self) -> int:
         return _URGENCY_RANK[self.urgency]
@@ -59,10 +82,12 @@ class Template:
         return {part: text.format(**slots) for part, text in copy.items()}
 
 
-def _t(id, topic, urgency, requires, slots, text, stages=()):
+def _t(id, topic, urgency, requires, slots, text, stages=(), conflicts=(),
+       primary_only=False):
     return Template(
         id=id, topic=topic, urgency=urgency, requires=tuple(requires),
         slots=tuple(slots), text=text, stages=tuple(stages),
+        conflicts=tuple(conflicts), primary_only=primary_only,
     )
 
 
@@ -71,6 +96,9 @@ TEMPLATES: tuple[Template, ...] = (
         "irrigation.hold", "irrigation", ADVISORY,
         requires=["waterBalance7dMm", "rainForecast7dMm"],
         slots=["rainMm"],
+        # "Do not irrigate for 7 days" cannot share a card with advice about
+        # what time of day to irrigate.
+        conflicts=["protection.heat_stress"],
         text={
             "en": {
                 "situation": "{rainMm} mm of rain is expected over the next 7 days.",
@@ -95,6 +123,9 @@ TEMPLATES: tuple[Template, ...] = (
     _t(
         "irrigation.apply", "irrigation", URGENT,
         requires=["waterBalance7dMm", "topsoilWater"],
+        # Not at maturity: the crop is meant to be drying down, and water then
+        # adds no yield while risking lodging and spoilage in storage.
+        stages=["establishment", "vegetative", "reproductive", "filling"],
         slots=["depthMm", "volumePerHaM3", "topsoilPct"],
         text={
             "en": {
@@ -184,6 +215,13 @@ TEMPLATES: tuple[Template, ...] = (
         "fertiliser.nitrogen_low", "fertiliser", ADVISORY,
         requires=["soilNitrogen", "ndviPercentile", "ureaTopdressKgPerHa"],
         slots=["behindPct", "ureaKgPerHa"],
+        # Nitrogen has a window, and it closes. Applied at grain fill the crop
+        # can no longer take much of it up, it delays maturity and costs grain
+        # quality — and the thin canopy that triggered this rule is, at that
+        # stage, ordinary senescence rather than hunger. Unknown stage is
+        # excluded too: without knowing where the crop is, withholding a dose
+        # is the cheaper mistake.
+        stages=["establishment", "vegetative"],
         text={
             "en": {
                 "situation": "Your canopy is behind {behindPct}% of nearby fields and "
@@ -309,6 +347,11 @@ TEMPLATES: tuple[Template, ...] = (
         "canopy.behind_neighbours", "canopy", URGENT,
         requires=["ndviPercentile"],
         slots=["behindPct"],
+        # Not at maturity: a canopy falling behind the neighbours then usually
+        # means this field is ripening first, which is not a problem to go
+        # looking for. Sending a farmer to walk a ripening field for pests is
+        # how an advisory loses their trust.
+        stages=["establishment", "vegetative", "reproductive", "filling"],
         text={
             "en": {
                 "situation": "Your canopy is weaker than {behindPct}% of the farms "
@@ -366,8 +409,10 @@ TEMPLATES: tuple[Template, ...] = (
         "soil.alkaline", "soil", ROUTINE,
         # Gated on the dose signal as well as the pH: this is advice about how
         # to place urea, and a legume that should never receive urea has no
-        # use for it.
+        # use for it. Gated on stage for the same reason — it appears only in
+        # the window where applying urea is itself advisable.
         requires=["soilPh", "ureaTopdressKgPerHa"],
+        stages=["establishment", "vegetative"],
         slots=["ph"],
         text={
             "en": {
@@ -394,9 +439,44 @@ TEMPLATES: tuple[Template, ...] = (
         },
     ),
     _t(
+        "harvest.dry_down", "harvest", ADVISORY,
+        requires=[],
+        slots=["days"],
+        stages=["maturity"],
+        # This screen's advice is "stop watering". Nothing about irrigating
+        # belongs beside it.
+        conflicts=["irrigation", "protection.heat_stress"],
+        text={
+            "en": {
+                "situation": "Your crop is {days} days from sowing and close to "
+                             "harvest.",
+                "action": "Stop irrigating now. Harvest when a grain is hard and "
+                          "your thumbnail leaves no mark on it.",
+                "reason": "Water this late adds no yield, and a damp crop at harvest "
+                          "spoils in storage.",
+            },
+            "hi": {
+                "situation": "बुवाई को {days} दिन हो चुके हैं — कटाई नज़दीक है।",
+                "action": "अब सिंचाई बंद कर दें। दाना जाँचें: जब नाखून से दबाने पर "
+                          "निशान न पड़े, तब कटाई करें।",
+                "reason": "इस समय पानी देने से पैदावार नहीं बढ़ती, और नमी वाली फसल "
+                          "भंडारण में ख़राब हो जाती है।",
+            },
+            "pt": {
+                "situation": "A lavoura está com {days} dias após a semeadura e perto "
+                             "da colheita.",
+                "action": "Pare de irrigar agora. Colha quando o grão estiver duro e a "
+                          "unha não deixar marca.",
+                "reason": "Água nesta fase não acrescenta produtividade, e lavoura "
+                          "úmida na colheita estraga no armazenamento.",
+            },
+        },
+    ),
+    _t(
         "canopy.healthy", "canopy", ROUTINE,
         requires=["ndviPercentile"],
         slots=["aheadPct"],
+        primary_only=True,
         text={
             "en": {
                 "situation": "Your canopy is ahead of {aheadPct}% of nearby farms.",

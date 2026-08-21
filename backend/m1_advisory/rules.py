@@ -104,6 +104,10 @@ CONDITIONS: dict[str, Condition] = {
         lambda s: (_n(s, "neighbourhoodMedianNdvi") or 1.0) < BARE_SOIL_NDVI,
     "soil.alkaline":
         lambda s: (_n(s, "soilPh") or 0) > ALKALINE_PH,
+    # The stage gate is the whole condition: at maturity this is always the
+    # right advice, whatever the weather is doing.
+    "harvest.dry_down":
+        lambda s: True,
     "canopy.healthy":
         lambda s: (_n(s, "ndviPercentile") or 0) >= AHEAD_OF_NEIGHBOURS,
 }
@@ -146,6 +150,8 @@ SLOTS: dict[str, Slots] = {
         lambda s: {},
     "soil.alkaline":
         lambda s: {"ph": round(_n(s, "soilPh") or 0, 1)},
+    "harvest.dry_down":
+        lambda s: {"days": s["__days__"]},
     "canopy.healthy":
         lambda s: {"aheadPct": _pct_behind(s)},
 }
@@ -200,7 +206,13 @@ def choose(
         return None, None
 
     primary = ranked[0]
-    secondary = next((t for t in ranked[1:] if t.topic != primary.topic), None)
+    secondary = next(
+        (t for t in ranked[1:]
+         if t.topic != primary.topic
+         and not t.primary_only
+         and not primary.conflicts_with(t)),
+        None,
+    )
     return primary, secondary
 
 
