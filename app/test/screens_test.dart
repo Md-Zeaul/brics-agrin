@@ -260,7 +260,6 @@ void main() {
 
       expect(find.text('Namaste, Rekha'), findsOneWidget);
       expect(find.text('Watch'), findsOneWidget); // YELLOW chip
-      expect(find.textContaining('0.9 mm of rain'), findsOneWidget);
       expect(find.textContaining('7.9 · alkaline'), findsOneWidget);
       expect(find.textContaining('1.33 g/kg · medium'), findsOneWidget);
       // The gap is stated, not hidden.

@@ -71,6 +71,12 @@ const Map<String, String> _farmerEn = {
   'home.scanCrop': 'Scan crop',
   'home.planSeason': 'Plan season',
   'home.speak': 'Read aloud',
+  'advisory.loading': 'Reading your field…',
+  'advisory.none': 'No advice yet — refresh once your field profile is built.',
+  'advisory.saved': 'Saved advice, not refreshed today.',
+  'advisory.fromDefaults': 'Based on district averages, not measurements of '
+      'your field.',
+  'advisory.stage': 'Growth stage',
 };
 
 const Map<String, String> _farmerHi = {
@@ -79,6 +85,11 @@ const Map<String, String> _farmerHi = {
   'home.scanCrop': 'फसल स्कैन करें',
   'home.planSeason': 'अगली फसल चुनें',
   'home.speak': 'सुनें',
+  'advisory.loading': 'आपका खेत पढ़ा जा रहा है…',
+  'advisory.none': 'अभी कोई सलाह नहीं — खेत की जानकारी बनने के बाद रिफ़्रेश करें।',
+  'advisory.saved': 'सहेजी हुई सलाह, आज ताज़ा नहीं की गई।',
+  'advisory.fromDefaults': 'यह इलाक़े के औसत पर आधारित है, आपके खेत की माप पर नहीं।',
+  'advisory.stage': 'फसल की अवस्था',
 };
 
 const Map<String, String> _farmerPt = {
@@ -87,6 +98,13 @@ const Map<String, String> _farmerPt = {
   'home.scanCrop': 'Escanear cultura',
   'home.planSeason': 'Planejar safra',
   'home.speak': 'Ouvir',
+  'advisory.loading': 'Lendo seu talhão…',
+  'advisory.none': 'Ainda sem recomendação — atualize depois que o perfil do '
+      'talhão for montado.',
+  'advisory.saved': 'Recomendação salva, não atualizada hoje.',
+  'advisory.fromDefaults': 'Baseado em médias regionais, não em medições do '
+      'seu talhão.',
+  'advisory.stage': 'Estádio da cultura',
 };
 
 // ---------------------------------------------------------------------------

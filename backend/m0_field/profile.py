@@ -48,6 +48,7 @@ def build_field_profile(
     seeded_soil: dict | None = None,
     ndvi_window: tuple[str, str] | None = None,
     crop: dict | None = None,
+    sowing_date: str | None = None,
 ) -> FieldProfile:
     """Build the profile for one field.
 
@@ -57,6 +58,8 @@ def build_field_profile(
     30-day median — pass RABI_PEAK_WINDOW to measure the wheat canopy.
     `crop` is what the farmer says is growing; M0 records it for M3 rather
     than using it, because the health rule is deliberately crop-neutral.
+    `sowing_date` is likewise recorded, not used — M1 needs it to place the
+    crop in its growth stage, and neither is a measurement of this field.
     """
     drawn = polygon is not None
     if polygon is None:
@@ -81,6 +84,7 @@ def build_field_profile(
         soil=Soil(),
         boundary_mode="drawn" if drawn else "pin",
         crop=crop or None,
+        sowing_date=sowing_date or None,
     )
     profile.sources["boundary"] = Provenance(
         source="farmer-drawn polygon" if drawn else "farmer pin",
@@ -89,6 +93,13 @@ def build_field_profile(
         if drawn
         else f"no boundary drawn; area is a default {plot_ha} ha square, not a measurement",
     ).to_dict()
+
+    if sowing_date:
+        profile.sources["sowingDate"] = Provenance(
+            source="farmer",
+            status=REPORTED,
+            note="used by M1 to place the crop in its growth stage",
+        ).to_dict()
 
     if crop:
         profile.sources["crop"] = Provenance(

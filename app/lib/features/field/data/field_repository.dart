@@ -58,12 +58,14 @@ class FieldRepository {
     double? fallbackNdvi,
     Map<String, dynamic>? seededSoil,
     Map<String, dynamic>? crop,
+    String? sowingDate,
   }) =>
       _build(
         fieldId: fieldId,
         fallbackNdvi: fallbackNdvi,
         seededSoil: seededSoil,
         crop: crop,
+        sowingDate: sowingDate,
         pin: (lat: lat, lng: lng),
       );
 
@@ -74,12 +76,14 @@ class FieldRepository {
     double? fallbackNdvi,
     Map<String, dynamic>? seededSoil,
     Map<String, dynamic>? crop,
+    String? sowingDate,
   }) =>
       _build(
         fieldId: fieldId,
         fallbackNdvi: fallbackNdvi,
         seededSoil: seededSoil,
         crop: crop,
+        sowingDate: sowingDate,
         polygon: polygon,
       );
 
@@ -88,6 +92,7 @@ class FieldRepository {
     double? fallbackNdvi,
     Map<String, dynamic>? seededSoil,
     Map<String, dynamic>? crop,
+    String? sowingDate,
     ({double lat, double lng})? pin,
     List<List<double>>? polygon,
   }) async {
@@ -99,6 +104,7 @@ class FieldRepository {
         fallbackNdvi: fallbackNdvi,
         seededSoil: seededSoil,
         crop: crop,
+        sowingDate: sowingDate,
       );
       await _cache.save(profile);
       return FieldProfileResult(profile: profile, origin: ProfileOrigin.live);

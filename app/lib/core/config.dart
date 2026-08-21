@@ -17,6 +17,14 @@ class AppConfig {
     defaultValue: 'http://localhost:8787/m0',
   );
 
+  /// M1 advisory endpoint. Takes the profile M0 already built and returns the
+  /// day's advice — the model key stays server-side, which is the whole reason
+  /// this is an endpoint rather than a call from the app.
+  static const String m1Endpoint = String.fromEnvironment(
+    'M1_ENDPOINT',
+    defaultValue: 'http://localhost:8787/m1',
+  );
+
   /// Google Maps Platform key. Empty until the key is provisioned, which the
   /// map view detects to fall back to a schematic renderer.
   static const String mapsApiKey = String.fromEnvironment('MAPS_KEY');

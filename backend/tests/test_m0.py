@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -733,3 +734,35 @@ class TestCredentialDiscovery(unittest.TestCase):
         self.assertEqual(
             adc_path(), Path("/custom/gcloud/application_default_credentials.json")
         )
+
+
+class TestSowingDate(unittest.TestCase):
+    """M0 records the sowing date without using it — M1 needs it, M0 does not."""
+
+    def _profile(self, **kwargs):
+        with _MockedSources():
+            from m0_field.profile import build_field_profile
+
+            return build_field_profile(pin={"lat": 29.61, "lng": 76.11}, **kwargs)
+
+    def test_it_is_absent_unless_the_farmer_gave_one(self):
+        profile = self._profile()
+        self.assertIsNone(profile.to_dict()["sowingDate"])
+        self.assertNotIn("sowingDate", profile.sources)
+
+    def test_it_is_recorded_as_reported_not_measured(self):
+        profile = self._profile(sowing_date="2026-06-20")
+        d = profile.to_dict()
+        self.assertEqual(d["sowingDate"], "2026-06-20")
+        self.assertEqual(d["sources"]["sowingDate"]["status"], REPORTED)
+
+    def test_the_provenance_entry_is_json_not_a_dataclass(self):
+        # Every other source stores .to_dict(); one that forgot would raise
+        # only at serialisation time, which is to say on the endpoint.
+        profile = self._profile(sowing_date="2026-06-20")
+        json.dumps(profile.to_dict())
+
+    def test_it_does_not_change_the_health_chip(self):
+        without = self._profile()
+        with_date = self._profile(sowing_date="2026-06-20")
+        self.assertEqual(without.health_chip, with_date.health_chip)

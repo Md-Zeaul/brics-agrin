@@ -50,7 +50,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   CropRegistry _registry = const CropRegistry([]);
   Crop? _crop = Crop.fallbackDefault;
-  DateTime _sowingDate = DateTime(2026, 11, 15);
+  /// Unset until the farmer says otherwise.
+  ///
+  /// A pre-filled date would be friendlier and would also be fabricated: it
+  /// feeds M1's growth stage, which decides whether a fertiliser window is
+  /// open. Left null, the stage stays `unknown` and stage-dependent advice is
+  /// simply not offered — which is the correct outcome for a field nobody has
+  /// told us about.
+  DateTime? _sowingDate;
+
+  /// ISO yyyy-mm-dd, or null. The shape M0 stores and M1 reads.
+  String? get _sowingDateIso =>
+      _sowingDate?.toIso8601String().split('T').first;
   /// Fallback only. When the app shell is above us the shared controller is
   /// the source of truth, so the toggle here and the one on S2 cannot disagree.
   String _language = 'hi';
@@ -177,12 +188,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               polygon: boundary,
               seededSoil: soilCard,
               crop: crop,
+              sowingDate: _sowingDateIso,
             )
           : await widget.repository.profileForPin(
               lat: _lat,
               lng: _lng,
               seededSoil: soilCard,
               crop: crop,
+              sowingDate: _sowingDateIso,
             );
 
       if (!mounted) return;
@@ -323,9 +336,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         onTap: () async {
                           final picked = await showDatePicker(
                             context: context,
-                            initialDate: _sowingDate,
-                            firstDate: DateTime(2025),
-                            lastDate: DateTime(2027),
+                            initialDate: _sowingDate ?? DateTime.now(),
+                            firstDate: DateTime(2024),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
                           );
                           if (picked != null) {
                             setState(() => _sowingDate = picked);
@@ -337,8 +352,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             border: OutlineInputBorder(),
                           ),
                           child: Text(
-                            '${_sowingDate.day}/${_sowingDate.month}/'
-                            '${_sowingDate.year}',
+                            _sowingDate == null
+                                ? 'Not set'
+                                : '${_sowingDate!.day}/${_sowingDate!.month}/'
+                                    '${_sowingDate!.year}',
+                            style: _sowingDate == null
+                                ? TextStyle(
+                                    color: Theme.of(context).colorScheme.outline,
+                                  )
+                                : null,
                           ),
                         ),
                       ),

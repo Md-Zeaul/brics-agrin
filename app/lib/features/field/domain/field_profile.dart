@@ -161,6 +161,7 @@ class FieldProfile {
     required this.centroid,
     required this.areaHa,
     this.boundaryMode = 'pin',
+    this.sowingDate,
     this.crop,
     required this.soil,
     required this.healthChip,
@@ -192,6 +193,13 @@ class FieldProfile {
   /// What the farmer said is growing, e.g. `{id: wheat, label: गेहूँ}`.
   /// Recorded for M3; M0's health rule is deliberately crop-neutral.
   final Map<String, dynamic>? crop;
+
+  /// When the farmer says they sowed, ISO yyyy-mm-dd.
+  ///
+  /// M0 measures nothing that reveals growth stage, so this is the only route
+  /// to it, and M1's fertiliser advice depends on it. Stored on the profile
+  /// rather than in app state so a cache resume does not lose it.
+  final String? sowingDate;
 
   /// True when [areaHa] came from the farmer's own boundary rather than the
   /// 1.5 ha default. The UI must not present the two alike.
@@ -240,6 +248,7 @@ class FieldProfile {
       areaHa: _toDouble(json['areaHa']) ?? 0,
       boundaryMode: json['boundaryMode'] as String? ?? 'pin',
       crop: (json['crop'] as Map?)?.cast<String, dynamic>(),
+      sowingDate: json['sowingDate'] as String?,
       soil: Soil.fromJson(json['soil'] as Map<String, dynamic>? ?? const {}),
       healthChip: HealthChip.parse(json['healthChip'] as String?),
       ndvi: _toDouble(json['ndvi']),
@@ -277,6 +286,7 @@ class FieldProfile {
         'areaHa': areaHa,
         'boundaryMode': boundaryMode,
         'crop': crop,
+        'sowingDate': sowingDate,
         'ndvi': ndvi,
         'ndviPercentile': ndviPercentile,
         'neighbourhoodMedianNdvi': neighbourhoodMedianNdvi,

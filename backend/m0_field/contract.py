@@ -73,6 +73,12 @@ class FieldProfile:
     # rule is deliberately crop-neutral — but M3 scoring will, and recording it
     # at capture time is the only moment it is cheap to ask.
     crop: dict | None = None
+
+    # When the farmer says they sowed, ISO yyyy-mm-dd. M0 measures nothing that
+    # reveals growth stage, so this is the only route to it — and M1's
+    # fertiliser advice is stage-dependent, which is why it lives on the
+    # profile rather than in app state that a cache miss would lose.
+    sowing_date: str | None = None
     ndvi: float | None = None
     ndvi_percentile: float | None = None        # rank among nearby cropland, 0-1
     neighbourhood_median_ndvi: float | None = None
@@ -96,6 +102,7 @@ class FieldProfile:
             "areaHa": self.area_ha,
             "boundaryMode": self.boundary_mode,
             "crop": self.crop,
+            "sowingDate": self.sowing_date,
             "ndvi": self.ndvi,
             "ndviPercentile": self.ndvi_percentile,
             "neighbourhoodMedianNdvi": self.neighbourhood_median_ndvi,

@@ -33,6 +33,8 @@ class M0Client {
   /// [fallbackNdvi] supplies a cached NDVI if Earth Engine is unreachable.
   /// [crop] is what the farmer says is growing — recorded for M3, not used by
   /// M0, whose health rule ranks against neighbours regardless of crop.
+  /// [sowingDate] is likewise recorded rather than used: M1 needs it to place
+  /// the crop in its growth stage, and M0 measures nothing that reveals one.
   Future<FieldProfile> buildProfile({
     ({double lat, double lng})? pin,
     List<List<double>>? polygon,
@@ -41,6 +43,7 @@ class M0Client {
     double? fallbackNdvi,
     Map<String, dynamic>? seededSoil,
     Map<String, dynamic>? crop,
+    String? sowingDate,
     Duration timeout = const Duration(seconds: 60),
   }) async {
     assert(pin != null || polygon != null, 'need a pin or a polygon');
@@ -54,6 +57,7 @@ class M0Client {
       'fallbackNdvi': ?fallbackNdvi,
       'seededSoil': ?seededSoil,
       'crop': ?crop,
+      'sowingDate': ?sowingDate,
     });
 
     late final http.Response response;

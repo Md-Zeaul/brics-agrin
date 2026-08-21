@@ -8,6 +8,8 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/l10n/language_button.dart';
+import '../../copilot/data/advisory_repository.dart';
+import '../../copilot/presentation/advisory_card.dart';
 import '../../../core/l10n/language_scope.dart';
 import '../../../core/routes.dart';
 import '../data/field_repository.dart';
@@ -21,12 +23,18 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.result,
     required this.repository,
+    this.advisories,
     this.crop = 'Wheat',
     this.language = 'hi',
   });
 
   final FieldProfileResult result;
   final FieldRepository repository;
+
+  /// Injectable so widget tests can drive the card without a server. Null
+  /// means "make one" rather than "do without", because a screen that silently
+  /// shows no advice is indistinguishable from one whose endpoint is down.
+  final AdvisoryRepository? advisories;
   final String crop;
   final String language;
 
@@ -36,9 +44,53 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late FieldProfileResult _result = widget.result;
+  late final AdvisoryRepository _advisories =
+      widget.advisories ?? AdvisoryRepository();
+
   bool _refreshing = false;
+  AdvisoryResult? _advisory;
+  bool _advising = false;
+  String? _advisedLanguage;
 
   FieldProfile get _profile => _result.profile;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The language lives in an inherited notifier, so S10's flip to Portuguese
+    // arrives here as a dependency change. Re-advise rather than leave Hindi
+    // text under a Portuguese interface.
+    final language = LanguageScope.languageOf(context).code;
+    if (language != _advisedLanguage) {
+      _advisedLanguage = language;
+      _loadAdvisory(language);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.advisories == null) _advisories.dispose();
+    super.dispose();
+  }
+
+  /// Cache first, then the network — the same order the profile follows, and
+  /// the reason S2 has something to show before any call completes.
+  Future<void> _loadAdvisory(String language) async {
+    final restored =
+        await _advisories.restored(_profile.fieldId, language);
+    if (!mounted || _advisedLanguage != language) return;
+    setState(() {
+      _advisory = restored;
+      _advising = true;
+    });
+
+    final live = await _advisories.adviseFor(_profile, language: language);
+    if (!mounted || _advisedLanguage != language) return;
+    setState(() {
+      if (live != null) _advisory = live;
+      _advising = false;
+    });
+  }
 
   /// Back to capture. Without this the first cached profile is a dead end —
   /// the farmer can never add a second plot and the demo can never show S1
@@ -68,7 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
               fieldId: _profile.fieldId,
               crop: _profile.crop,
             );
-      if (mounted) setState(() => _result = refreshed);
+      if (mounted) {
+        setState(() => _result = refreshed);
+        await _loadAdvisory(_advisedLanguage ?? 'en');
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -192,35 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          // M1 will replace this placeholder with the Gemini advisory.
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('TODAY', style: theme.textTheme.labelSmall),
-                  const SizedBox(height: 8),
-                  Text(
-                    _profile.rainForecastMm != null
-                        ? '${_profile.rainForecastMm!.toStringAsFixed(1)} mm '
-                            'of rain expected tomorrow.'
-                        : 'Rain forecast unavailable.',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'The spoken Gemini advisory arrives with M1. '
-                    'M0 has supplied the signals it will reason over.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          AdvisoryCard(result: _advisory, loading: _advising),
           const SizedBox(height: 16),
 
           _Section(
