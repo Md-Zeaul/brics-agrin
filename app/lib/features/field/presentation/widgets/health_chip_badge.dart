@@ -44,11 +44,16 @@ class HealthChipBadge extends StatelessWidget {
           ),
           if (driver != null) ...[
             const SizedBox(width: 6),
-            Text(
-              '· ${driver!.replaceAll('_', ' ')}',
-              style: TextStyle(
-                color: colour.withValues(alpha: 0.8),
-                fontSize: 12,
+            // Flexible, because the explanation is a sentence — "ahead of 87%
+            // of nearby farms" — and a phone is 390 logical pixels wide. Fixed
+            // text here overflows the row the chip sits in.
+            Flexible(
+              child: Text(
+                '· ${driver!.replaceAll('_', ' ')}',
+                style: TextStyle(
+                  color: colour.withValues(alpha: 0.8),
+                  fontSize: 12,
+                ),
               ),
             ),
           ],

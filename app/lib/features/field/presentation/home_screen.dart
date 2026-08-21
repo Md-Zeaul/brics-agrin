@@ -7,6 +7,9 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/l10n/language_button.dart';
+import '../../../core/l10n/language_scope.dart';
+import '../../../core/routes.dart';
 import '../data/field_repository.dart';
 import '../domain/field_profile.dart';
 import 'onboarding_screen.dart';
@@ -78,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = LanguageScope.stringsOf(context);
     final soil = _profile.soil;
     final chipDriver = _explainDriver(
       _profile.sources['healthChip']?.note?.replaceFirst('driver: ', ''),
@@ -86,8 +90,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Namaste, Rekha'),
+        title: Text(t('home.greeting')),
         actions: [
+          const LanguageButton(),
           IconButton(
             onPressed: _refreshing ? null : _startNewField,
             icon: const Icon(Icons.add_location_alt_outlined),
@@ -122,13 +127,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   '${_result.warning ?? ''}',
             ),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              HealthChipBadge(
-                chip: _profile.healthChip,
-                driver: chipDriver,
-              ),
-              const Spacer(),
               Flexible(
+                flex: 3,
+                child: HealthChipBadge(
+                  chip: _profile.healthChip,
+                  driver: chipDriver,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                flex: 2,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -151,6 +161,31 @@ class _HomeScreenState extends State<HomeScreen> {
                       textAlign: TextAlign.end,
                     ),
                   ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // The brief's two primary actions. They navigate today, into stubs,
+          // so the happy path can be walked end-to-end before M2 and M3 land.
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(Routes.scan),
+                  icon: const Icon(Icons.center_focus_strong_outlined),
+                  label: Text(t('home.scanCrop')),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: () =>
+                      Navigator.of(context).pushNamed(Routes.planner),
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  label: Text(t('home.planSeason')),
                 ),
               ),
             ],
@@ -298,6 +333,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 24),
         ],
       ),
+      bottomNavigationBar: _SideSwitch(
+        farmerLabel: t('nav.farmer'),
+        commandLabel: t('nav.commandCenter'),
+      ),
     );
   }
 
@@ -428,5 +467,48 @@ String? _explainDriver(String? driver, double? percentile) {
       return 'no satellite reading yet';
     default:
       return driver.replaceAll('_', ' ');
+  }
+}
+
+/// The brief's top switch between the two sides of the app, put at the foot
+/// where a thumb reaches it. The farmer side is already here, so tapping it is
+/// a no-op rather than a redundant push.
+class _SideSwitch extends StatelessWidget {
+  const _SideSwitch({required this.farmerLabel, required this.commandLabel});
+
+  final String farmerLabel;
+  final String commandLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Container(
+        height: 52,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Center(
+                child: Text(
+                  farmerLabel,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: TextButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(Routes.commandCenter),
+                child: Text(commandLabel),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

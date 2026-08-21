@@ -12,17 +12,23 @@ Specs: `AgriSetu_Build_Brief.docx` (what to build) · `AgriSetu_Tech_Spec.docx`
 | Module | State |
 |---|---|
 | **M0 Field intelligence** | **Built and fully live** — all six signals, NDVI included |
-| M1–M8 | Not started |
+| App shell | S1–S10 navigable; runtime language switching (en / hi / pt) |
+| M1–M8 | Not started — S3–S10 are stubs naming the module and its owner |
+
+New here? [CONTRIBUTING.md](CONTRIBUTING.md) has setup, credentials, who owns
+which module, and the branch workflow.
 
 ## Layout
 
-    backend/            M0 field intelligence (Python, stdlib only)
+    backend/            M0 field intelligence (Python, stdlib + earthengine-api)
       m0_field/         package: sources, geometry, health rules, contract
       main.py           Cloud Function entrypoint
       dev_server.py     local M0 endpoint, no GCP needed
       run_local.py      CLI: build a profile, write the seed fallback
-      tests/            23 unit tests, offline
-    app/                Flutter client (S1 field capture, S2 profile)
+      tests/            77 unit tests, offline
+    app/                Flutter client
+      lib/core/         shell: routes, language, build-time config
+      lib/features/     one folder per module, owned whole
     data/seed/          seeded/fallback data
 
 ## Run it
@@ -47,8 +53,8 @@ Check Earth Engine credentials on their own:
 
 ## Tests
 
-    python3 -m unittest discover -s backend/tests -t backend/tests   # 23
-    cd app && flutter test                                           # 19
+    .venv/bin/python -m unittest discover -s backend/tests -t backend/tests   # 77
+    cd app && flutter analyze && flutter test                                  # 87
 
 ## Configuration
 

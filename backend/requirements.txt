@@ -1,4 +1,9 @@
 # M0 runs on the standard library alone for its key-free sources
 # (SoilGrids, Open-Meteo, NASA POWER). Only NDVI needs a dependency.
+#
+#     python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+#
+# functions-framework is only used by the Cloud Function entrypoint in main.py;
+# the local dev server needs nothing but the stdlib and earthengine-api.
 functions-framework==3.*
 earthengine-api==1.*

@@ -3,6 +3,11 @@
     GCP_PROJECT=my-project GCP_SA_JSON=~/.config/agrisetu/gcp-sa.json \
         .venv/bin/python backend/check_ee.py
 
+Or, with no key file at all, having run `gcloud auth application-default
+login` under an account that holds a role on the project:
+
+    GCP_PROJECT=my-project .venv/bin/python backend/check_ee.py
+
 Runs the same call path M0 uses and reports the first thing that is wrong, so a
 credential problem is diagnosed in one step instead of surfacing as a silent
 fallback to cached NDVI.
@@ -40,31 +45,41 @@ def main() -> int:
         return 1
     report(OK, f"GCP_PROJECT = {project}")
 
-    if not key_path:
-        report(FAIL, "GCP_SA_JSON is not set (path to the service-account JSON key)")
-        return 1
+    # Two credential shapes are legitimate. A service-account key is what the
+    # deployed function uses; Application Default Credentials is what a
+    # collaborator with an IAM role uses, and it needs no key handed around.
+    from m0_field.sources.earth_engine import adc_path
 
-    key_file = Path(key_path).expanduser()
-    if not key_file.exists():
-        report(FAIL, f"key file not found: {key_file}")
-        return 1
-    report(OK, f"key file found: {key_file}")
+    key_file = None
+    if key_path:
+        key_file = Path(key_path).expanduser()
+        if not key_file.exists():
+            report(FAIL, f"key file not found: {key_file}")
+            return 1
+        report(OK, f"key file found: {key_file}")
 
-    try:
-        key = json.loads(key_file.read_text())
-    except json.JSONDecodeError as error:
-        report(FAIL, f"key file is not valid JSON: {error}")
-        return 1
+        try:
+            key = json.loads(key_file.read_text())
+        except json.JSONDecodeError as error:
+            report(FAIL, f"key file is not valid JSON: {error}")
+            return 1
 
-    if key.get("type") != "service_account":
-        report(FAIL, f"key type is {key.get('type')!r}, expected 'service_account' "
-                     "— this looks like an OAuth client, not a service account")
-        return 1
-    report(OK, f"service account: {key.get('client_email')}")
+        if key.get("type") != "service_account":
+            report(FAIL, f"key type is {key.get('type')!r}, expected 'service_account' "
+                         "— this looks like an OAuth client, not a service account")
+            return 1
+        report(OK, f"service account: {key.get('client_email')}")
 
-    if key.get("project_id") and key["project_id"] != project:
-        report(FAIL, f"key belongs to project {key['project_id']!r} "
-                     f"but GCP_PROJECT is {project!r}")
+        if key.get("project_id") and key["project_id"] != project:
+            report(FAIL, f"key belongs to project {key['project_id']!r} "
+                         f"but GCP_PROJECT is {project!r}")
+            return 1
+    elif adc_path().is_file():
+        report(OK, f"application default credentials: {adc_path()}")
+    else:
+        report(FAIL, "no credentials found. Either set GCP_SA_JSON to a "
+                     "service-account key, or run:\n"
+                     "      gcloud auth application-default login")
         return 1
 
     try:
@@ -75,7 +90,8 @@ def main() -> int:
     report(OK, f"earthengine-api {ee.__version__}")
 
     # Everything below exercises the real M0 call path.
-    os.environ["GCP_SA_JSON"] = str(key_file)
+    if key_file is not None:
+        os.environ["GCP_SA_JSON"] = str(key_file)
     from m0_field.geometry import square_polygon_around
     from m0_field.sources.earth_engine import EarthEngineUnavailable, fetch_ndvi
 

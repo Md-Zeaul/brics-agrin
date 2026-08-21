@@ -9,6 +9,8 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/config.dart';
+import '../../../core/l10n/app_language.dart';
+import '../../../core/l10n/language_scope.dart';
 import '../data/field_repository.dart';
 import '../domain/crop.dart';
 import '../domain/geometry.dart';
@@ -49,7 +51,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   CropRegistry _registry = const CropRegistry([]);
   Crop? _crop = Crop.fallbackDefault;
   DateTime _sowingDate = DateTime(2026, 11, 15);
+  /// Fallback only. When the app shell is above us the shared controller is
+  /// the source of truth, so the toggle here and the one on S2 cannot disagree.
   String _language = 'hi';
+
+  String get _activeLanguage =>
+      LanguageScope.maybeOf(context)?.language.code ?? _language;
+
+  void _setLanguage(String code) {
+    setState(() => _language = code);
+    LanguageScope.maybeOf(context)?.switchTo(AppLanguage.fromCode(code));
+  }
   bool _building = false;
 
   /// Optional Soil Health Card values; these outrank the district average.
@@ -156,8 +168,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ? null
           : <String, dynamic>{
               'id': _crop!.id,
-              'label': _crop!.label(_language),
-              'language': _language,
+              'label': _crop!.label(_activeLanguage),
+              'language': _activeLanguage,
             };
 
       final result = _drawing
@@ -179,8 +191,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           builder: (_) => HomeScreen(
             result: result,
             repository: widget.repository,
-            crop: _crop?.label(_language) ?? 'Crop',
-            language: _language,
+            crop: _crop?.label(_activeLanguage) ?? 'Crop',
+            language: _activeLanguage,
           ),
         ),
       );
@@ -207,12 +219,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: SegmentedButton<String>(
+              showSelectedIcon: false,
               segments: const [
                 ButtonSegment(value: 'hi', label: Text('हिं')),
                 ButtonSegment(value: 'en', label: Text('EN')),
+                ButtonSegment(value: 'pt', label: Text('PT')),
               ],
-              selected: {_language},
-              onSelectionChanged: (s) => setState(() => _language = s.first),
+              selected: {_activeLanguage},
+              onSelectionChanged: (s) => _setLanguage(s.first),
             ),
           ),
         ],
@@ -299,7 +313,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: CropPicker(
                         registry: _registry,
                         selected: _crop,
-                        language: _language,
+                        language: _activeLanguage,
                         onChanged: (crop) => setState(() => _crop = crop),
                       ),
                     ),

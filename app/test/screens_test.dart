@@ -248,6 +248,7 @@ void main() {
 
   group('S2 home', () {
     testWidgets('shows the M0 signals and their provenance', (tester) async {
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -294,6 +295,7 @@ void main() {
         soilRange: const {'ph': (low: 6.2, high: 10.3)},
       );
 
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -326,6 +328,7 @@ void main() {
 
       expect(profile.weeklyWaterBalanceMm, closeTo(3.7 - 5.39 * 7, 0.01));
 
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -353,6 +356,7 @@ void main() {
     });
 
     testWidgets('a live NDVI replaces the pending label', (tester) async {
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -372,6 +376,7 @@ void main() {
 
     testWidgets('GREEN explains itself instead of repeating the word',
         (tester) async {
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -399,6 +404,7 @@ void main() {
 
     testWidgets('a pinned area is labelled a default, not a measurement',
         (tester) async {
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -413,6 +419,7 @@ void main() {
     });
 
     testWidgets('a drawn area says it was measured', (tester) async {
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -429,6 +436,7 @@ void main() {
     });
 
     testWidgets('the crop the farmer chose is the one shown', (tester) async {
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -447,6 +455,7 @@ void main() {
     testWidgets('a restored profile is not called offline', (tester) async {
       // Booting from cache attempts no network call, so claiming the farmer is
       // offline would be a guess presented as a fact.
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -466,6 +475,7 @@ void main() {
 
     testWidgets('a second field can be captured from the profile',
         (tester) async {
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -485,6 +495,7 @@ void main() {
     });
 
     testWidgets('offline cache shows the banner', (tester) async {
+      tester.useTallSurface();
       await tester.pumpWidget(
         MaterialApp(
           home: HomeScreen(
@@ -507,6 +518,19 @@ void main() {
 // --- Boundary drawing (M0's "drops a pin (or draws a boundary)") ---
 
 extension on WidgetTester {
+  /// A lazy ListView only builds what fits the viewport, so on the default
+  /// 600px test surface a section that exists further down simply is not there
+  /// to find. S2 is a long scroll and gains a card with every module; asserting
+  /// against a tall surface keeps those tests about content, not about how far
+  /// the page happens to have grown this week. The width stays phone-sized so
+  /// overflow still fails loudly.
+  void useTallSurface() {
+    view.physicalSize = const Size(1170, 3600);
+    view.devicePixelRatio = 3.0;
+    addTearDown(view.resetPhysicalSize);
+    addTearDown(view.resetDevicePixelRatio);
+  }
+
   Future<void> pumpOnboarding() async {
     await pumpWidget(
       MaterialApp(home: OnboardingScreen(repository: FieldRepository())),

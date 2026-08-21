@@ -15,6 +15,7 @@ field polygon and reduced to a mean.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from ..contract import CACHED, LIVE, Provenance
 from ..geometry import to_geojson
@@ -47,9 +48,35 @@ class EarthEngineUnavailable(RuntimeError):
     """Earth Engine is not configured, not approved yet, or returned nothing."""
 
 
+def adc_path() -> Path:
+    """Where `gcloud auth application-default login` writes its credential."""
+    config = os.environ.get("CLOUDSDK_CONFIG")
+    if config:
+        return Path(config) / "application_default_credentials.json"
+    if os.name == "nt":  # pragma: no cover - the team is on macOS
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "gcloud" / "application_default_credentials.json"
+    return Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
+
+
 def earth_engine_ready() -> bool:
-    """True when a service account credential is configured for Earth Engine."""
-    return bool(os.environ.get("GCP_SA_JSON") or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
+    """True when Earth Engine has some credential to initialise with.
+
+    Three shapes count, and the third is the one that bites. `GCP_SA_JSON` is
+    this repo's own variable and `GOOGLE_APPLICATION_CREDENTIALS` is the
+    standard one, but `gcloud auth application-default login` — the path a
+    collaborator with an IAM role uses, and the one that needs no key file
+    handed around — sets no environment variable at all. It writes a file and
+    says nothing.
+
+    Missing that case fails silently rather than loudly: NDVI degrades to
+    unavailable, the health chip still renders off the other signals, and
+    nobody notices the satellite was never asked.
+    """
+    if os.environ.get("GCP_SA_JSON") or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        return True
+    return adc_path().is_file()
 
 
 def fetch_ndvi(

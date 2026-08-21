@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -21,6 +23,7 @@ from m0_field.contract import (  # noqa: E402
     Soil,
 )
 from m0_field.sources import nasa_power, soilgrids  # noqa: E402
+from m0_field.sources.earth_engine import adc_path, earth_engine_ready  # noqa: E402
 
 
 class TestGeometry(unittest.TestCase):
@@ -685,3 +688,48 @@ class TestRecoveredSignals(unittest.TestCase):
         with _MockedSources() as mocks:
             profile = _build(mocks)
         self.assertEqual(profile.radiation_score, 0.475)
+
+
+class TestCredentialDiscovery(unittest.TestCase):
+    """`gcloud auth application-default login` sets no environment variable.
+
+    A readiness check that only looks at the environment therefore reports "no
+    credentials" for a correctly-configured collaborator, and M0 degrades to
+    unavailable NDVI without saying why.
+    """
+
+    def setUp(self):
+        self._saved = {
+            key: os.environ.pop(key, None)
+            for key in ("GCP_SA_JSON", "GOOGLE_APPLICATION_CREDENTIALS", "CLOUDSDK_CONFIG")
+        }
+
+    def tearDown(self):
+        for key, value in self._saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def test_the_repo_variable_counts(self):
+        os.environ["GCP_SA_JSON"] = "/anywhere/key.json"
+        self.assertTrue(earth_engine_ready())
+
+    def test_the_standard_google_variable_counts(self):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/anywhere/key.json"
+        self.assertTrue(earth_engine_ready())
+
+    def test_application_default_credentials_count(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["CLOUDSDK_CONFIG"] = tmp
+            self.assertFalse(
+                earth_engine_ready(), "an empty gcloud config is not a credential"
+            )
+            (Path(tmp) / "application_default_credentials.json").write_text("{}")
+            self.assertTrue(earth_engine_ready())
+
+    def test_adc_path_follows_the_gcloud_config_override(self):
+        os.environ["CLOUDSDK_CONFIG"] = "/custom/gcloud"
+        self.assertEqual(
+            adc_path(), Path("/custom/gcloud/application_default_credentials.json")
+        )
