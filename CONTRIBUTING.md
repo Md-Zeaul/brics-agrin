@@ -24,7 +24,7 @@ outside `PATH`, so every command below assumes:
     cp .env.example .env
     # set GCP_PROJECT; leave GCP_SA_JSON unset
 
-**4. Earth Engine credentials — no key file changes hands.**
+**4. Google credentials — no key file changes hands.**
 
     gcloud auth application-default login
     gcloud auth application-default set-quota-project "$GCP_PROJECT"
@@ -32,6 +32,15 @@ outside `PATH`, so every command below assumes:
 Your Google account already holds a role on the project, which is
 authorisation. This command is authentication — the separate question of
 proving who you are. Being granted a role does not log you in.
+
+The same login serves Earth Engine (M0's NDVI) and Vertex AI (M1's chooser).
+They need two *different* things switched on, and both are easy to miss:
+
+- the API enabled on the project — `aiplatform.googleapis.com` for Vertex
+- an IAM role on your account — `roles/aiplatform.user`
+
+Enabling the API without the role fails as `403 aiplatform.endpoints.predict
+denied`, which reads like a billing problem and is not one.
 
 **5. Check it before trusting it.**
 
@@ -46,8 +55,8 @@ signals, and nothing tells you the satellite was never asked.
 
 Two terminals.
 
-    # 1 — the M0 endpoint. Use the venv python; the system one has no
-    #     earthengine-api and NDVI silently falls back.
+    # 1 — the backend: /m0 and /m1. Use the venv python; the system one has
+    #     no earthengine-api and NDVI silently falls back.
     source .env && .venv/bin/python backend/dev_server.py    # :8787
 
     # 2 — the app
@@ -55,7 +64,16 @@ Two terminals.
     cd app && flutter run -d chrome
 
 A profile takes roughly 20 seconds to build the first time — six sources, one
-of them Earth Engine. That is not a hang.
+of them Earth Engine. That is not a hang. The advisory that follows takes 1–2
+seconds.
+
+To see one advisory decided step by step, with no app and no browser:
+
+    .venv/bin/python backend/trace_advisory.py --sown 2026-06-20 --language hi
+
+To force the rules path and check the fallback still reads well:
+
+    M1_DISABLE_GEMINI=1 .venv/bin/python backend/trace_advisory.py --sown 2026-06-20
 
 To stop them:
 

@@ -9,26 +9,32 @@ Specs: `AgriSetu_Build_Brief.docx` (what to build) · `AgriSetu_Tech_Spec.docx`
 
 ## Status
 
-| Module | State |
-|---|---|
-| **M0 Field intelligence** | **Built and fully live** — all six signals, NDVI included |
-| App shell | S1–S10 navigable; runtime language switching (en / hi / pt) |
-| M1–M8 | Not started — S3–S10 are stubs naming the module and its owner |
+| Module | Screens | State |
+|---|---|---|
+| **M0 Field intelligence** | S1, S2 | **Live** — all six signals, NDVI included |
+| **M1 AI Farmer Copilot** | S2 | **Live** — Gemini chooses, rules fall back. Voice deferred (#10) |
+| App shell | S1–S10 | Navigable end to end; runtime language switching (en / hi / pt) |
+| M2–M8 | S3–S10 | Not started — every screen is a stub naming its module and GitHub issue |
 
-New here? [CONTRIBUTING.md](CONTRIBUTING.md) has setup, credentials, who owns
-which module, and the branch workflow.
+New here? [CONTRIBUTING.md](CONTRIBUTING.md) has setup, credentials, module
+order and the branch workflow. Picking up mid-build? [HANDOFF.md](HANDOFF.md)
+is the state of play in one file.
 
 ## Layout
 
-    backend/            M0 field intelligence (Python, stdlib + earthengine-api)
-      m0_field/         package: sources, geometry, health rules, contract
-      main.py           Cloud Function entrypoint
-      dev_server.py     local M0 endpoint, no GCP needed
+    backend/            Python, stdlib + earthengine-api
+      m0_field/         M0: sources, geometry, health rules, contract
+      m1_advisory/      M1: signals, growth stage, doses, products,
+                            templates, rules, Gemini chooser
+      main.py           Cloud Function entrypoints (m0_field, m1_advisory)
+      dev_server.py     local /m0 and /m1, no GCP needed
       run_local.py      CLI: build a profile, write the seed fallback
-      tests/            77 unit tests, offline
+      trace_advisory.py CLI: every step from signal to sentence
+      check_ee.py       CLI: Earth Engine credential preflight
+      tests/            203 unit tests, offline
     app/                Flutter client
       lib/core/         shell: routes, language, build-time config
-      lib/features/     one folder per module, owned whole
+      lib/features/     one folder per module
     data/seed/          seeded/fallback data
 
 ## Run it
@@ -91,6 +97,7 @@ signal unavailable instead of blanking the home screen.
 | Rain + temperature forecast | Open-Meteo | no |
 | Root-zone moisture, radiation | NASA POWER | no |
 | NDVI | Sentinel-2 via Earth Engine | **yes** — configured, project `brics-agrin` |
+| Advisory template choice | Gemini 2.5 Flash via Vertex AI (`asia-south1`) | **yes** — degrades to rules |
 
 ## M0 is complete
 
@@ -226,6 +233,134 @@ figure downstream would then divide by. `is_simple` guards it in
 `backend/m0_field/geometry.py`, `isSimple` mirrors it in Dart so S1 disables
 Confirm and says "Lines cross", and `build_field_profile` refuses it with a 400
 regardless of which client calls.
+
+## M1 is live
+
+The advisory card on S2. One field profile in, one situation line and up to two
+actions out, in English, Hindi or Portuguese.
+
+### The model picks; it never writes
+
+    signals → eligible templates → a chooser picks from them → render
+
+Gemini sees only the templates the data already supports and returns ids from
+that list. It is never asked what the farmer should do, only which of the
+applicable, human-written recommendations fits best. The consequences are the
+point:
+
+- **A hallucinated template id is a no-op.** Anything outside the eligible set
+  is discarded rather than corrected, and the rules chooser decides instead.
+- **Hindi and Portuguese are written by a person**, so the agricultural
+  register is right. A machine translation of "top dressing" or "tillering" is
+  confidently wrong in both.
+- **The rendered text is deterministic**, so every line can be pre-cached for
+  TTS, and a test asserts which template was chosen rather than how a sentence
+  came out.
+- **Rules are a complete fallback, not a sanity check.** With Gemini disabled,
+  unreachable or returning nonsense, the same rules choose from the same
+  templates and the farmer still gets a card. On a bad day they *are* M1.
+
+Five tests drive a deliberately misbehaving chooser — inventing an id, naming
+an ineligible one, raising, pairing two templates on the same topic, pairing
+two that contradict each other — and assert the card survives each.
+
+Gemini earns its place on the ties. On the demo field the rules picked
+`topdress_window + irrigation.watch`, a tie broken by file order. Gemini picked
+`topdress_window + soil.alkaline`, pairing the urea instruction with the
+placement advice that stops pH 7.9 soil wasting it: *"the crop is in its main
+growth phase and needs fertilizer, and the soil pH requires a specific
+application method."*
+
+### Absence is the eligibility test
+
+A signal whose M0 source came back `unavailable` is not carried forward as
+null — it is **absent**, and any template requiring it is ineligible before its
+condition is even evaluated. There is no null check anywhere, because presence
+in the signal dict *is* the check.
+
+The same mechanism does agronomic work. Legumes fix their own nitrogen, so the
+urea dose signal is simply withheld for soybean, chickpea, lentil, groundnut,
+pigeon pea, green gram and common bean — and every template that quotes a dose
+becomes ineligible through exactly the path a missing satellite reading takes.
+That caught a template nobody was thinking about: `soil.alkaline`, whose advice
+is about how to place urea, which a chickpea grower cannot use.
+
+### Advice is a quantity, not a verb
+
+"Plan a nitrogen top-dressing" is not an instruction. The card says *"spread 85
+kg of urea per hectare, then irrigate lightly to wash it in"*, and every number
+is arithmetic over a named rate — urea is 46% nitrogen, wheat wants 120 kg N/ha
+for the season, the vegetative split is a third of it. Rates are published
+extension figures, marked `seeded`, and the copy says so.
+
+### Sowing date decides what may be said
+
+`stage.py` holds a 21-crop calendar and places the crop in one of
+establishment / vegetative / reproductive / filling / maturity. It gates what
+is sayable, which fixed three real defects:
+
+- Nitrogen at grain fill delays maturity and costs grain quality, and the thin
+  canopy that would have triggered it is ordinary senescence rather than
+  hunger. Dose templates are now vegetative-only.
+- A ripening field was being flagged as failing against its neighbours.
+- At maturity the card could say "stop irrigating, harvest in 6 days" and
+  "irrigate 25 mm" at once. Templates now declare conflicts by id or topic, and
+  a contradictory pair is dropped whether the rules or the model chose it.
+
+### It remembers what the field has already had
+
+S1 optionally asks what has already been applied and when the field was last
+watered — the two facts no satellite can supply. Products differ enormously:
+two bags an acre of urea is 102 kg N/ha, most of a wheat season, while two bags
+of DAP is 40 kg and covers the phosphorus too.
+
+The input is a ladder, and every rung is a legitimate place to stop:
+
+| Answered | Bought |
+|---|---|
+| a date | the next dose is held back 21 days |
+| + a product | potash stops triggering that hold; phosphorus advice is withheld where DAP went on |
+| + a quantity | the season's remaining nitrogen is arithmetic, not a general rate |
+
+"Don't remember" is a real answer at every rung and degrades to the one below.
+Manure has no quantity path at all — it is spread by the trolley and its
+analysis depends on what the animals ate, so a figure from it would be a guess
+in the costume of an analysis. A farmer who skips the control entirely gets
+exactly the advisory they got before it existed.
+
+Suppression alone would be half a job, so each withheld recommendation becomes
+advice instead of silence:
+
+    no log            → "Spread 85 kg of urea per hectare"
+    DAP 1 bag/acre    → "22 of roughly 120 kg … spread 85 kg"
+    urea 2 bags/acre  → "102 of roughly 120 kg … spread 40 kg"
+    urea 3 bags/acre  → "Do not buy more urea for this crop"
+    urea 9 days ago   → "next split due in about 12 days"
+    watered yesterday → "Do not irrigate again yet. Dig to spade depth first"
+
+### Tracing one card
+
+Every step from raw signal to rendered sentence, in one command:
+
+    .venv/bin/python backend/trace_advisory.py --sown 2026-06-20 \
+        --fertilised 2026-08-12:urea:1 --irrigated 2026-08-20 --language hi
+
+Eight sections: input, sources, signals, derived, gates, choice, rendered, and
+what the advice rests on. `--pin lat,lng` builds a fresh profile instead of
+reading the fixture.
+
+### Known limits
+
+- **Voice is deferred** (#10). The Build Brief asks for a speaker button and a
+  mic; M1 ships text-only. The templates are deterministic precisely so the TTS
+  clips can be pre-cached when voice lands.
+- **No free-form Q&A, deliberately.** Cut for grounding risk — mandi prices we
+  do not have, pesticide doses that can cause real harm — and for the six
+  seconds of dead air a full STT → LLM → TTS round trip costs on stage.
+- **Season nitrogen rates are general.** They are the published figures an
+  extension service starts from, not a prescription for one field, and variety,
+  previous crop and organic matter all move them. Everything derived from them
+  is marked `seeded` and the copy repeats it.
 
 ## NDVI: which reading to show
 
